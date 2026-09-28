@@ -1,0 +1,13 @@
+{
+  "name": "nova-store-ar",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Arabic RTL ecommerce store with full admin control - zero external dependencies",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
