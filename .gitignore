@@ -1,0 +1,3 @@
+data/store.json
+*.log
+.DS_Store
