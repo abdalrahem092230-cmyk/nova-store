@@ -7,7 +7,9 @@ const form = document.getElementById("checkoutForm"),
   orderButton = document.getElementById("orderBtn"),
   message = document.getElementById("checkoutMessage");
 const fmt = (n) =>
-  new Intl.NumberFormat("ar-LY", { maximumFractionDigits: 2 }).format(n) +
+  new Intl.NumberFormat("ar-LY-u-nu-latn", { maximumFractionDigits: 2 }).format(
+    n,
+  ) +
   " " +
   novaSettings.currency;
 const safe = (s) =>

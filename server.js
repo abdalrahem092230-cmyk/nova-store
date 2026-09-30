@@ -8,6 +8,7 @@ const { URL } = require("url");
 const LIBYA_AREAS = require("./libya-locations");
 const ADMIN_ORDERS = require("./admin-orders");
 const CUSTOMER = require("./customer-account");
+const MOBILE = require("./mobile-api");
 const CUSTOMER_SESSION_SECRET =
   process.env.CUSTOMER_SESSION_SECRET || crypto.randomBytes(32).toString("hex");
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "",
@@ -94,9 +95,18 @@ const seed = {
 };
 const Store = require("./storage");
 const COMMERCE = require("./commerce");
-const pool = process.env.DATABASE_URL
+const databaseUrl =
+  process.env.NEON_DATABASE_URL ||
+  (process.env.NOVA_PREVIEW === "true" ? null : process.env.DATABASE_URL);
+if (
+  process.env.RENDER === "true" &&
+  !databaseUrl &&
+  process.env.NOVA_PREVIEW !== "true"
+)
+  throw Error("A durable production database is required");
+const pool = databaseUrl
   ? new (require("pg").Pool)({
-      connectionString: process.env.DATABASE_URL,
+      connectionString: databaseUrl,
       max: 5,
       connectionTimeoutMillis: 10000,
       idleTimeoutMillis: 30000,
@@ -108,6 +118,11 @@ pool?.on("error", () => console.error("Database connection interrupted"));
 const storage = new Store({ file: FILE, seed, pool });
 const S = () => storage.read(),
   W = (x) => storage.write(x);
+const mobile = MOBILE.create({
+  readState: () => storage.read(),
+  writeState: (d) => storage.write(d),
+  afterCommit: (fn) => storage.afterCommit(fn),
+});
 const esc = (s) =>
     String(s ?? "").replace(
       /[&<>"']/g,
@@ -120,12 +135,12 @@ const esc = (s) =>
           "'": "&#39;",
         })[c],
     ),
-  money = (n) => new Intl.NumberFormat("ar-LY").format(+n || 0),
+  money = (n) => new Intl.NumberFormat("ar-LY-u-nu-latn").format(+n || 0),
   sessions = new Map();
 const css = `.features{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}.feat{padding:20px;border:1px solid var(--line);border-radius:12px}.feat b{display:block;margin:8px 0;font-size:21px}.feat .muted{font-size:11px}.adminnav{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:20px}.table{width:100%;border-collapse:collapse;min-width:720px}.table th,.table td{padding:14px;border-bottom:1px solid var(--line);text-align:right;font-size:12px}.scroll{overflow:auto}.login{min-height:100vh;display:grid;place-items:center}.login .adminbox{width:min(430px,92vw)}@media(max-width:700px){.features{grid-template-columns:1fr 1fr}}`;
 const proCss = "";
 function page(title, body, extra = "", meta = {}) {
-  if(process.env.NOVA_PREVIEW==='true')meta={...meta,noindex:true};
+  if (process.env.NOVA_PREVIEW === "true") meta = { ...meta, noindex: true };
   if (/حساب|دخول/.test(title) && !meta.path)
     meta = { ...meta, path: "/account", noindex: true };
   const s = S().settings,
@@ -162,7 +177,7 @@ function page(title, body, extra = "", meta = {}) {
       }
     : null;
   const wa = String(s.wa || "").replace(/\D/g, "");
-  return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#243d31"><meta name="description" content="${esc(description)}"><meta property="og:type" content="${meta.product ? "product" : "website"}"><meta property="og:locale" content="ar_LY"><meta property="og:title" content="${esc(title)} — ${esc(s.name)}"><meta property="og:description" content="${esc(description)}"><meta property="og:url" content="${esc(canonical)}">${meta.image ? `<meta property="og:image" content="${esc(meta.image)}">` : ""}<link rel="canonical" href="${esc(canonical)}">${meta.noindex ? '<meta name="robots" content="noindex,nofollow">' : ""}<link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;500;600;700;800&display=swap" rel="stylesheet"><title>${esc(title)} — ${esc(s.name)}</title><style>${CUSTOMER.accountCss()}${STOREFRONT.css}</style>${structured ? `<script type="application/ld+json">${VIEWS.json(structured)}</script>` : ""}</head><body><a class="skipLink" href="#main-content">انتقل إلى المحتوى</a><div class="top">${process.env.NOVA_PREVIEW==='true'?'نسخة معاينة تجريبية — لا تستقبل طلبات · ':''}${s.free > 0 ? `شحن مجاني للطلبات من ${money(s.free)} ${esc(s.currency)}` : "اختيارات نوفا، توصل لبابك"}<span> / </span><b class="desktopOnly">تفاصيل صغيرة. يوم أجمل.</b></div><header class="nav"><div class="wrap navin"><a class="brand" href="/" aria-label="${esc(s.name)} — الرئيسية"><span class="logo">N</span><span>${esc(s.name)}<small>${esc(s.en)}</small></span></a><nav class="navlinks" aria-label="القائمة الرئيسية"><a href="/">الرئيسية</a><a href="/#shop">المجموعة</a><a href="/?sale=1#shop">التخفيضات</a><a href="/track">تتبّع طلبك</a></nav><form class="navsearch" action="/#shop" method="get"><input name="q" aria-label="ابحث عن منتج" placeholder="ابحث عن شيء تحبّه"><button type="submit" aria-label="بحث">${icon("search")}</button></form><div class="navactions"><a class="iconBtn desktopOnly" href="/account" aria-label="حسابي">${icon("user")}</a><button class="iconBtn" type="button" onclick="toggleFavoritesView()" aria-label="عرض المفضلة">${icon("heart")}<span class="navBadge" id="fc">0</span></button><a class="cartBtn" href="/checkout" aria-label="فتح السلة">${icon("bag")}<span class="cartText">السلة</span><span class="cartCount" data-cart-count>0</span></a><details class="mobileMenu"><summary class="iconBtn" aria-label="فتح القائمة">${icon("menu")}</summary><nav class="mobilePanel"><a href="/">الرئيسية</a><a href="/#shop">المجموعة</a><a href="/?sale=1#shop">التخفيضات</a><a href="/track">تتبّع طلبك</a><a href="/account">حسابي</a></nav></details></div></div></header>${body}<footer class="footer"><div class="wrap footerGrid"><div><div class="footerBrand">${esc(s.name)}<small style="display:block;font-size:10px;letter-spacing:3px">${esc(s.en)}</small></div><p class="footerNote muted">تفاصيل صغيرة تختارها لنفسك، وقطع تحب تهديها.<br>مساحتك لاكتشاف شيء يشبهك، كل يوم.</p></div><div><h4>خذ لفة في نوفا</h4><a href="/#shop">كل المجموعة</a><a href="/?sale=1#shop">التخفيضات</a><a href="/?favorites=1#shop">المفضلة</a><a href="/account">حسابي</a></div><div><h4>نحن هنا لمساعدتك</h4><a href="/track">تتبّع الطلب</a><a href="/shipping">الشحن والتوصيل</a><a href="/returns">الاستبدال والاسترجاع</a><a href="/privacy">الخصوصية</a>${wa ? `<a href="https://wa.me/${wa}" target="_blank" rel="noopener">تواصل عبر واتساب ↗</a>` : ""}</div></div><div class="wrap footerBottom"><span>© ${new Date().getFullYear()} ${esc(s.en)}. جميع الحقوق محفوظة.</span><span>اختيارات يومية. بطابع مختلف.</span></div></footer><nav class="mobileBar" aria-label="التنقل السريع">${[
+  return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#243d31"><meta name="description" content="${esc(description)}"><meta property="og:type" content="${meta.product ? "product" : "website"}"><meta property="og:locale" content="ar_LY"><meta property="og:title" content="${esc(title)} — ${esc(s.name)}"><meta property="og:description" content="${esc(description)}"><meta property="og:url" content="${esc(canonical)}">${meta.image ? `<meta property="og:image" content="${esc(meta.image)}">` : ""}<link rel="canonical" href="${esc(canonical)}">${meta.noindex ? '<meta name="robots" content="noindex,nofollow">' : ""}<link rel="icon" href="/nova-avatar.svg" type="image/svg+xml"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;500;600;700;800&display=swap" rel="stylesheet"><title>${esc(title)} — ${esc(s.name)}</title><style>${CUSTOMER.accountCss()}${STOREFRONT.css}</style>${structured ? `<script type="application/ld+json">${VIEWS.json(structured)}</script>` : ""}</head><body><a class="skipLink" href="#main-content">انتقل إلى المحتوى</a><div class="top">${process.env.NOVA_PREVIEW === "true" ? "نسخة معاينة تجريبية — لا تستقبل طلبات · " : ""}${s.free > 0 ? `شحن مجاني للطلبات من ${money(s.free)} ${esc(s.currency)}` : "اختيارات نوفا، توصل لبابك"}<span> / </span><b class="desktopOnly">تفاصيل صغيرة. يوم أجمل.</b></div><header class="nav"><div class="wrap navin"><a class="brand" href="/" aria-label="${esc(s.name)} — الرئيسية"><img class="logo logoImg" src="/nova-avatar.svg" alt="" width="42" height="42"><span>${esc(s.name)}<small>${esc(s.en)}</small></span></a><nav class="navlinks" aria-label="القائمة الرئيسية"><a href="/">الرئيسية</a><a href="/#shop">المجموعة</a><a href="/?sale=1#shop">التخفيضات</a><a href="/track">تتبّع طلبك</a></nav><form class="navsearch" action="/#shop" method="get"><input name="q" aria-label="ابحث عن منتج" placeholder="ابحث عن شيء تحبّه"><button type="submit" aria-label="بحث">${icon("search")}</button></form><div class="navactions"><a class="iconBtn desktopOnly" href="/account" aria-label="حسابي">${icon("user")}</a><button class="iconBtn" type="button" onclick="toggleFavoritesView()" aria-label="عرض المفضلة">${icon("heart")}<span class="navBadge" id="fc">0</span></button><a class="cartBtn" href="/checkout" aria-label="فتح السلة">${icon("bag")}<span class="cartText">السلة</span><span class="cartCount" data-cart-count>0</span></a><details class="mobileMenu"><summary class="iconBtn" aria-label="فتح القائمة">${icon("menu")}</summary><nav class="mobilePanel"><a href="/">الرئيسية</a><a href="/#shop">المجموعة</a><a href="/?sale=1#shop">التخفيضات</a><a href="/track">تتبّع طلبك</a><a href="/account">حسابي</a></nav></details></div></div></header>${body}<footer class="footer"><div class="wrap footerGrid"><div><div class="footerBrand">${esc(s.name)}<small style="display:block;font-size:10px;letter-spacing:3px">${esc(s.en)}</small></div><p class="footerNote muted">تفاصيل صغيرة تختارها لنفسك، وقطع تحب تهديها.<br>مساحتك لاكتشاف شيء يشبهك، كل يوم.</p></div><div><h4>خذ لفة في نوفا</h4><a href="/#shop">كل المجموعة</a><a href="/?sale=1#shop">التخفيضات</a><a href="/?favorites=1#shop">المفضلة</a><a href="/account">حسابي</a></div><div><h4>نحن هنا لمساعدتك</h4><a href="/track">تتبّع الطلب</a><a href="/shipping">الشحن والتوصيل</a><a href="/returns">الاستبدال والاسترجاع</a><a href="/privacy">الخصوصية</a>${wa ? `<a href="https://wa.me/${wa}" target="_blank" rel="noopener">تواصل عبر واتساب ↗</a>` : ""}</div></div><div class="wrap footerBottom"><span>© ${new Date().getFullYear()} ${esc(s.en)}. جميع الحقوق محفوظة.</span><span>اختيارات يومية. بطابع مختلف.</span></div></footer><nav class="mobileBar" aria-label="التنقل السريع">${[
     ["home", "/", "الرئيسية"],
     ["grid", "/#shop", "المجموعة"],
     ["bag", "/checkout", "السلة"],
@@ -534,7 +549,7 @@ function adminLoginAllowed(req) {
 function admin(req, msg = "") {
   let session = ses(req);
   if (!session)
-    return `<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${STOREFRONT.css}${css}${adminTheme}</style><title>دخول الإدارة — NOVA STORE</title><meta name="robots" content="noindex,nofollow"></head><body class="login"><form class="adminbox" method="post" action="/admin/login"><div class="brand"><span class="logo">N</span><span>لوحة إدارة NOVA</span></div><h2>دخول المالك</h2>${msg ? `<p style="color:#ff8b95">${esc(msg)}</p>` : ""}<div class="field"><label>البريد</label><input class="input" name="email" required></div><div class="field"><label>كلمة المرور</label><input class="input" type="password" name="password" required></div><button class="btn hot">دخول</button></form></body></html>`;
+    return `<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${STOREFRONT.css}${css}${adminTheme}</style><title>دخول الإدارة — NOVA STORE</title><meta name="robots" content="noindex,nofollow"></head><body class="login"><form class="adminbox" method="post" action="/admin/login"><div class="brand"><img class="logo logoImg" src="/nova-avatar.svg" alt="" width="42" height="42"><span>لوحة إدارة NOVA</span></div><h2>دخول المالك</h2>${msg ? `<p style="color:#ff8b95">${esc(msg)}</p>` : ""}<div class="field"><label>البريد</label><input class="input" name="email" required></div><div class="field"><label>كلمة المرور</label><input class="input" type="password" name="password" required></div><button class="btn hot">دخول</button></form></body></html>`;
   let token = session?.csrf || "",
     d = S(),
     s = d.settings,
@@ -588,7 +603,8 @@ function send(res, n, b, t = "text/html; charset=utf-8", h = {}) {
     "content-type": t,
     "x-content-type-options": "nosniff",
     "referrer-policy": "no-referrer",
-    "x-frame-options": "DENY",
+    "x-frame-options":
+      process.env.NOVA_PREVIEW === "true" ? "SAMEORIGIN" : "DENY",
     "cache-control": "no-store",
     "permissions-policy": "camera=(), microphone=(), geolocation=()",
     ...h,
@@ -599,13 +615,49 @@ function red(res, x) {
   send(res, 302, "", "text/plain", { location: x });
 }
 async function handle(req, res) {
-  if(process.env.NOVA_PREVIEW==='true'&&req.method==='POST'&&req.url!=='/api/quote')return send(res,403,JSON.stringify({error:'هذه نسخة معاينة. الطلبات والحسابات متاحة على المتجر الأساسي فقط.'}),'application/json');
+  if (
+    process.env.NOVA_PREVIEW === "true" &&
+    ["POST", "PATCH"].includes(req.method) &&
+    req.url !== "/api/quote"
+  )
+    return send(
+      res,
+      403,
+      JSON.stringify({
+        error:
+          "هذه نسخة معاينة. الطلبات والحسابات متاحة على المتجر الأساسي فقط.",
+      }),
+      "application/json",
+    );
+  if (await mobile.handle(req, res)) return;
   if (req.method === "HEAD") {
     req.method = "GET";
     res._head = true;
   }
   let u = new URL(req.url, "http://x"),
     p = u.pathname;
+  if (
+    req.method === "GET" &&
+    ["/nova-avatar.svg", "/nova-avatar.png"].includes(p)
+  )
+    return send(
+      res,
+      200,
+      fs.readFileSync(path.join(__dirname, "nova-avatar.svg"), "utf8"),
+      "image/svg+xml",
+    );
+  if (
+    req.method === "GET" &&
+    p === "/preview-mobile" &&
+    process.env.NOVA_PREVIEW === "true"
+  )
+    return send(
+      res,
+      200,
+      '<!doctype html><html><head><meta name="robots" content="noindex"><title>NOVA mobile layout preview</title></head><body style="margin:0;background:#e5e0d8;display:flex;justify-content:center"><iframe title="NOVA mobile viewport" src="/" style="width:390px;height:850px;border:0;background:white"></iframe></body></html>',
+      "text/html; charset=utf-8",
+      { "x-frame-options": "SAMEORIGIN" },
+    );
   if (req.method === "GET" && p === "/favicon.svg")
     return send(
       res,
@@ -727,7 +779,10 @@ async function handle(req, res) {
       }),
       "application/json",
     );
-  if (req.method === "POST" && (p === "/order" || p === "/api/quote")) {
+  if (
+    ["POST", "PATCH"].includes(req.method) &&
+    (p === "/order" || p === "/api/quote")
+  ) {
     try {
       const input = await jsonBody(req),
         d = S();
@@ -1026,7 +1081,7 @@ async function handle(req, res) {
     return red(res, "/admin#products");
   }
   if (
-    req.method === "POST" &&
+    ["POST", "PATCH"].includes(req.method) &&
     ["/admin/product-restore", "/admin/order-restore"].includes(p)
   ) {
     const x = form(await parseBody(req));
@@ -1171,7 +1226,7 @@ setInterval(() => {
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, "http://localhost");
-    if (req.method === "POST") {
+    if (["POST", "PATCH"].includes(req.method)) {
       if (
         req.headers.origin &&
         new URL(req.headers.origin).host !== req.headers.host
@@ -1197,7 +1252,9 @@ const server = http.createServer(async (req, res) => {
         response.body = body;
       },
     };
-    await storage.run(req.method === "POST", () => handle(req, buffered));
+    await storage.run(["POST", "PATCH"].includes(req.method), () =>
+      handle(req, buffered),
+    );
     res.writeHead(...response.args);
     res.end(response.body);
   } catch (err) {
@@ -1219,9 +1276,22 @@ server.requestTimeout = 30000;
 server.headersTimeout = 15000;
 storage
   .init()
-  .then(async()=>{
-    await storage.run(false,()=>{const d=S();console.log('NOVA storage verified: products='+d.products.length+'; orders='+d.orders.length+'; customers='+(d.customers||[]).length);});
-    if(!process.env.CUSTOMER_SESSION_SECRET)console.warn('CUSTOMER_SESSION_SECRET is not configured; customer sessions reset on restart');
+  .then(async () => {
+    await storage.run(false, () => {
+      const d = S();
+      console.log(
+        "NOVA storage verified: products=" +
+          d.products.length +
+          "; orders=" +
+          d.orders.length +
+          "; customers=" +
+          (d.customers || []).length,
+      );
+    });
+    if (!process.env.CUSTOMER_SESSION_SECRET)
+      console.warn(
+        "CUSTOMER_SESSION_SECRET is not configured; customer sessions reset on restart",
+      );
   })
   .then(() =>
     server.listen(PORT, "0.0.0.0", () =>

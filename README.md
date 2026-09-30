@@ -16,14 +16,14 @@ The server listens on `0.0.0.0:$PORT` (default 3000). Both `node server.js` and 
 
 ## Render configuration
 
-- `DATABASE_URL`: existing PostgreSQL connection string. Set this for durable production storage. Prefer Render's internal same-region connection URL.
+- `NEON_DATABASE_URL`: existing primary Neon connection string. Production starts with the existing Neon database; `DATABASE_URL` is only a secondary development compatibility option.
 - `PGSSL=true`: enable verified TLS when connecting over an external connection; the default internal Render connection does not need this flag.
 - `ADMIN_EMAIL`, `ADMIN_PASSWORD`: existing owner credentials.
 - `CUSTOMER_SESSION_SECRET`: a strong, stable random value. Without it, sessions reset at each process restart.
 - `DATA_DIR`: local storage directory for development or a mounted persistent disk. Local storage supports one process only. Render's ordinary filesystem is ephemeral; do not rely on it for production orders.
 - Existing optional `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_UPLOAD_PRESET`, `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` integrations remain supported.
 
-No new paid resources are required by this change. Before production deployment, confirm the service's actual workspace, start command, environment variable names, database connection and recoverable database backup. Do not print secret values.
+The native mobile API and Telegram notifications remain compatible with the installed application. Both mobile and web mutations use the same transaction-backed store. No new paid resources are required by this change. Before production deployment, confirm the service's actual workspace, start command, environment variable names, database connection and recoverable database backup. Do not print secret values.
 
 ## Persistence and compatibility
 

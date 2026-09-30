@@ -1981,3 +1981,51 @@ summary:focus-visible {
     scroll-behavior: auto !important;
   }
 }
+
+/* Preserve the installed NOVA avatar and mixed Arabic/Latin readability. */
+.logoImg {
+  object-fit: cover;
+  display: block;
+  background: transparent;
+  border-radius: 12px;
+  max-width: none;
+}
+.priceLine,
+.cartPrice,
+.cartCount,
+.navBadge {
+  unicode-bidi: isolate;
+}
+@media (max-width: 760px) {
+  .desktopOnly {
+    display: none !important;
+  }
+  .logoImg {
+    width: 36px;
+    height: 36px;
+  }
+}
+/* Keep hero decoration inside its own text and image blocks. */
+.novaCopy h1 em {
+  display: inline-block;
+  white-space: nowrap;
+}
+.heroSmall img {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+}
+.heroSmall {
+  bottom: 100px;
+}
+@media (max-width: 760px) {
+  .heroSmall {
+    bottom: 80px;
+  }
+  .heroCaption {
+    font-size: 10px;
+  }
+  .novaCopy h1 {
+    font-size: 52px;
+  }
+}

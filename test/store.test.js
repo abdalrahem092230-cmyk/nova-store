@@ -218,6 +218,8 @@ test("HTTP pages, embedded scripts, escaping, checkout, tracking, admin inventor
       PORT: String(port),
       DATA_DIR: dir,
       DATABASE_URL: "",
+      NEON_DATABASE_URL: "",
+      RENDER: "",
       ADMIN_EMAIL: "test@example.test",
       ADMIN_PASSWORD: "test-password",
       CUSTOMER_SESSION_SECRET: "test-secret",
@@ -372,5 +374,65 @@ test("HTTP pages, embedded scripts, escaping, checkout, tracking, admin inventor
     img: "https://example.com/a.jpg",
   });
   assert.equal(invalid.status, 400);
+  // Preserve installed native app response shapes and shared inventory.
+  const bootstrap = await (await fetch(base + "/api/mobile/bootstrap")).json();
+  assert.equal(bootstrap.products[0].id, "p1");
+  assert(bootstrap.locations[city]);
+  const registered = await post("/api/mobile/register", {
+    name: "مستخدم التطبيق",
+    phone: "0921111111",
+    password: "native-password",
+  });
+  assert.equal(registered.status, 201);
+  const auth = await registered.json();
+  assert(auth.token);
+  assert(!auth.customer.passwordHash);
+  const authHeaders = { authorization: "Bearer " + auth.token };
+  const me = await (
+    await fetch(base + "/api/mobile/me", { headers: authHeaders })
+  ).json();
+  assert.equal(me.customer.id, auth.customer.id);
+  const profile = await fetch(base + "/api/mobile/profile", {
+    method: "PATCH",
+    headers: { ...authHeaders, "content-type": "application/json" },
+    body: JSON.stringify({ name: "اسم التطبيق المحدّث" }),
+  });
+  assert.equal(profile.status, 200);
+  const mobileInput = {
+    ...orderInput({ requestId: "mobile-test-0000001" }),
+    phone: "0921111111",
+  };
+  const mobileFirst = await post("/api/mobile/order", mobileInput, authHeaders);
+  assert.equal(mobileFirst.status, 201);
+  const mobileOrder = (await mobileFirst.json()).order;
+  const mobileAgain = await post("/api/mobile/order", mobileInput, authHeaders);
+  assert.equal((await mobileAgain.json()).order.id, mobileOrder.id);
+  assert.equal(disk().products[0].stock, 4);
+  const legacyInput = { ...orderInput(), phone: "0921111111" };
+  delete legacyInput.requestId;
+  delete legacyInput.expectedTotal;
+  const legacy = await post("/api/mobile/order", legacyInput, authHeaders);
+  assert.equal(legacy.status, 201, "installed v1 app contract");
+  assert((await legacy.json()).order.id);
+  const history = await (
+    await fetch(base + "/api/mobile/orders", { headers: authHeaders })
+  ).json();
+  assert.equal(history.orders.length, 2);
+  assert.equal(
+    (
+      await fetch(
+        base + "/api/mobile/track?id=" + mobileOrder.id + "&phone=0920000000",
+      )
+    ).status,
+    404,
+  );
+  assert.equal(
+    (
+      await fetch(base + "/api/mobile/track?id=" + mobileOrder.id, {
+        headers: authHeaders,
+      })
+    ).status,
+    200,
+  );
   assert(!output.includes("Request failed"), output);
 });
