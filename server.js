@@ -668,7 +668,20 @@ function renderDiagnostics() {
     products: Array.isArray(d.products) ? d.products.length : -1,
     orders: Array.isArray(d.orders) ? d.orders.length : -1,
     customers: Array.isArray(d.customers) ? d.customers.length : 0,
+    customerAuthRecordsInvalid: Array.isArray(d.customers)
+      ? d.customers.filter(
+          (c) =>
+            !c ||
+            typeof c.passwordSalt !== "string" ||
+            !c.passwordSalt ||
+            typeof c.passwordHash !== "string" ||
+            !/^[0-9a-f]{128}$/i.test(c.passwordHash),
+        ).length
+      : 0,
+    adminConfigured: Boolean(ADMIN_EMAIL && ADMIN_PASSWORD),
   };
+  if (out.customerAuthRecordsInvalid) out.ok = false;
+
   try {
     ADMIN_ORDERS.renderOrders(
       d,
