@@ -1,6 +1,8 @@
 name: Android Production Build
 
 on:
+  push:
+    branches: [nova-mobile-v1]
   pull_request:
     branches: [main]
   workflow_dispatch:
