@@ -92,6 +92,20 @@ jobs:
           cat /tmp/body || true
           test "$code" = "401"
 
+      - name: Malformed stale cookies do not break login pages
+        shell: bash
+        run: |
+          set -euo pipefail
+          for base in "https://nova-store-icxo.onrender.com" "https://nova-store.l.cd"; do
+            code="$(curl -sS -o /tmp/body -w "%{http_code}" --max-time 20               -H 'cookie: sid=%E0%A4%A; nova_customer=%ZZ'               "$base/admin/login")"
+            echo "$base admin malformed cookie -> $code"
+            test "$code" = "200"
+
+            code="$(curl -sS -o /tmp/body -w "%{http_code}" --max-time 20               -H 'cookie: sid=%E0%A4%A; nova_customer=%ZZ'               "$base/account/login")"
+            echo "$base account malformed cookie -> $code"
+            test "$code" = "200"
+          done
+
       - name: Check health payload
         shell: bash
         run: |
