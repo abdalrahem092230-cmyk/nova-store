@@ -1,7 +1,7 @@
 const fs=require('fs'),path=require('path'),crypto=require('crypto');
 const CUSTOMER=require('./customer-account'),LOCATIONS=require('./libya-locations');
 const FILE=path.join(process.env.DATA_DIR||path.join(__dirname,'data'),'store.json');
-const SECRET=process.env.CUSTOMER_SESSION_SECRET||crypto.randomBytes(32).toString('hex');
+const SECRET=process.env.CUSTOMER_SESSION_SECRET||crypto.createHash('sha256').update('nova-mobile:'+String(process.env.NEON_DATABASE_URL||'local-dev')).digest('hex');
 const S=()=>{try{return JSON.parse(fs.readFileSync(FILE,'utf8'))}catch{return {settings:{},products:[],orders:[],customers:[]}}};
 const W=d=>fs.writeFileSync(FILE,JSON.stringify(d,null,2));
 const phone=v=>String(v||'').replace(/\D/g,'');
