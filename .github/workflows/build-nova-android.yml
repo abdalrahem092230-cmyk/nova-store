@@ -35,7 +35,7 @@ jobs:
       - name: Install dependencies
         run: |
           npm install
-          npx expo install babel-preset-expo
+          npx expo install babel-preset-expo @expo/vector-icons expo-navigation-bar
 
       - name: Validate Expo project
         run: npx expo-doctor
