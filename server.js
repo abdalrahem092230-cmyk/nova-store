@@ -1012,6 +1012,7 @@ async function handle(req, res) {
       },
     );
   }
+  if (req.method === "GET" && p === "/admin/login") return send(res, 200, admin(req));
   if (req.method === "GET" && p === "/admin") return send(res, 200, admin(req));
   if (req.method === "GET" && p === "/admin/orders-ping") {
     if (!ses(req)) return send(res, 401, "{}", "application/json");
