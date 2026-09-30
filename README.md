@@ -1,50 +1,44 @@
-# NOVA STORE
+# LogicSpark 0.1.0
 
-Arabic RTL storefront for the existing NOVA store, with a warm editorial design, responsive catalog, favorites, stock-aware checkout, customer accounts and order management.
+An offline Android logic puzzle game, based on the approved playable prototype. English and Arabic. Ten levels: patterns, shape equations, ordering, number grids, deductions, a maze and strategy.
 
-## Run
+## Current preview
+- Local progress, score, language, partial ordering and maze position survive restarting.
+- Explanations after solving; one hint per level.
+- Each level starts at 100 points, minus 20 per wrong submission and 30 for a hint, minimum 10.
+- Main menu, resume, replay, and Android back navigation.
+- All assets bundled; no network permission, account, live ads, or analytics.
+- Application ID: `com.logicspark.game.preview`; Android 8.0+.
 
-Node.js 18 or newer:
+## Project layout
+- `app/src/main/assets/`: UI (`index.html`, `style.css`, `app.js`), content (`puzzles.js`), reusable logic (`core.js`).
+- `app/src/main/java/`: lightweight Android host with an offline WebView.
+- `test/`: scoring/save/maze unit tests and browser end-to-end tests.
+- `.github/workflows/build-logicspark.yml`: checks, APK build, signature verification and downloadable artifacts.
 
-```sh
-npm ci
-npm test
-npm start
+## Local development
+Use Node.js 22, JDK 17, Android SDK 35 and Gradle 8.9.
 ```
+npm test
+npm install
+npx playwright install chromium
+npm run test:ui
+npm run serve
+gradle lintDebug assembleDebug
+```
+Open `http://localhost:8000` for browser development. Android Studio can import the Gradle project. The initial CI build generates a Gradle wrapper for subsequent builds.
 
-The server listens on `0.0.0.0:$PORT` (default 3000). Both `node server.js` and the existing `node server-db.js` Render start command use the same application.
+## Preview signing
+The build uses the standard debug key generated on the build runner. No signing keys or production credentials are stored in this repository. Until a stable private signing configuration is set up, APKs from separate builds may require uninstalling the earlier preview, which clears its local progress. Do not use debug signing for Google Play publication.
 
-## Render configuration
+## GitHub location
+This standalone project is initially stored on the `logicspark` branch of the connected repository. Its root contains only the game. **Do not merge this branch into the store's main branch**; move it to a dedicated repository when repository creation becomes available.
 
-- `NEON_DATABASE_URL`: existing primary Neon connection string. Production starts with the existing Neon database; `DATABASE_URL` is only a secondary development compatibility option.
-- `PGSSL=true`: enable verified TLS when connecting over an external connection; the default internal Render connection does not need this flag.
-- `ADMIN_EMAIL`, `ADMIN_PASSWORD`: existing owner credentials.
-- `CUSTOMER_SESSION_SECRET`: a strong, stable random value. Without it, sessions reset at each process restart.
-- `DATA_DIR`: local storage directory for development or a mounted persistent disk. Local storage supports one process only. Render's ordinary filesystem is ephemeral; do not rely on it for production orders.
-- Existing optional `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_UPLOAD_PRESET`, `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` integrations remain supported.
+## Roadmap
+1. Test on actual Android devices and refine layout, controls and difficulty.
+2. Expand the puzzle bank and add progression and an actual daily challenge.
+3. Improve visual identity, transitions, accessibility and sound preferences.
+4. Integrate AdMob with test IDs first; show hints without ads while unavailable.
+5. Prepare release signing, privacy disclosures and current Google Play requirements before publication.
 
-The native mobile API and Telegram notifications remain compatible with the installed application. Both mobile and web mutations use the same transaction-backed store. No new paid resources are required by this change. Before production deployment, confirm the service's actual workspace, start command, environment variable names, database connection and recoverable database backup. Do not print secret values.
-
-## Persistence and compatibility
-
-The application preserves the existing `nova_state` JSONB row, including store names, products, customers, credentials and historical orders. It does not recreate or truncate existing data. PostgreSQL reads fetch current state; mutations use a row lock and commit before the HTTP success response. Connection failures return an error instead of accepting unpersisted orders. Notifications run after the commit. Local development writes use serialized operations and atomic file replacement; corrupt data is never silently replaced with demo products.
-
-The existing single-document model remains appropriate for a small catalog but serializes all writes. A high-traffic deployment should move orders/products into separate indexed tables through a separately reviewed migration, rather than assuming horizontal scaling solves this bottleneck.
-
-## Checkout and inventory
-
-- The browser refreshes product availability and server-calculated prices before confirmation.
-- Checkout rejects fractional quantities, unavailable quantities, deleted products and changed totals.
-- A persistent request key makes retried order submissions idempotent.
-- Cancellation restores stock once. Archiving only hides an order and never adjusts inventory.
-- Products can be hidden/restored; historical product references are retained.
-- Completed orders, archived orders and customer accounts remain in the existing database.
-- Password changes invalidate other customer sessions. Guest checkout remains supported.
-
-Old already-open checkout pages must be refreshed after this release because order submissions now include a request key and reviewed total.
-
-## Validation
-
-`npm test` covers pricing, merged duplicate cart lines, overselling, idempotency, concurrency, rollback, corruption handling, session revocation, HTTP routes, embedded JavaScript syntax, hostile product-name escaping, tracking privacy, admin cancellation/archive semantics, product restoration and rejected invalid data. The PostgreSQL transaction test uses an injected client to exercise commit/failure ordering; a live database check is still required at deployment.
-
-Before publishing, review desktop and mobile layouts in a reachable preview, then check `/health`, `/api/catalog`, search, favorites, product gallery, cart quantities and checkout validation. Test purchases should only be submitted against isolated test data. The local execution environment could not be reached by the cloud browser, so visual verification remains a deployment gate.
+The preview is for playtesting, not a production release. No paid service is used by the game.

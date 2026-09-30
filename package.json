@@ -1,18 +1,7 @@
 {
-  "name": "nova-store-ar",
-  "version": "2.0.0",
+  "name": "logicspark",
+  "version": "0.1.0",
   "private": true,
-  "description": "Arabic RTL ecommerce store with full admin control",
-  "scripts": {
-    "start": "node server.js",
-    "start:db": "node server-db.js",
-    "dev": "node --watch server.js",
-    "test": "node --test test/*.test.js"
-  },
-  "engines": {
-    "node": ">=18"
-  },
-  "dependencies": {
-    "pg": "^8.13.1"
-  }
+  "scripts": {"test": "node --test test/core.test.cjs", "test:ui": "node test/ui.cjs", "serve": "python3 -m http.server 8000 --directory app/src/main/assets"},
+  "devDependencies": {"playwright": "1.58.2"}
 }

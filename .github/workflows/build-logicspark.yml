@@ -1,0 +1,65 @@
+name: Build LogicSpark preview
+on:
+  push:
+    branches: [logicspark]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: logicspark-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check logic and saved progress
+        run: npm test
+      - name: Install browser test dependencies
+        run: |
+          npm install --ignore-scripts --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Play all puzzles and test resume and small screens
+        run: npm run test:ui
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android platform
+        run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0' 'build-tools;34.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Build and lint Android
+        run: |
+          gradle --no-daemon wrapper --gradle-version 8.9
+          ./gradlew --no-daemon lintDebug assembleDebug
+      - name: Verify APK signature and package
+        run: |
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose app/build/outputs/apk/debug/app-debug.apk
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging app/build/outputs/apk/debug/app-debug.apk
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/app-debug.apk dist/LogicSpark-v0.1.0-preview.apk
+          sha256sum dist/LogicSpark-v0.1.0-preview.apk > dist/SHA256SUMS.txt
+          zip -r dist/gradle-wrapper.zip gradle gradlew gradlew.bat
+      - name: Upload preview APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: LogicSpark-v0.1.0-preview
+          path: dist/
+          retention-days: 30
+      - name: Upload screenshots and lint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: LogicSpark-checks
+          path: |
+            test-results/
+            app/build/reports/lint-results-debug.html
+          if-no-files-found: ignore
+          retention-days: 30
