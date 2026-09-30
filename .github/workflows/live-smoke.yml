@@ -143,3 +143,11 @@ jobs:
           grep -q '"storage":"postgres"' /tmp/health.json
           grep -q '"accountSessions":"signed"' /tmp/health.json
           grep -q '"adminSessions":"signed"' /tmp/health.json
+          build="$(python - <<'PY'
+import json
+print(json.load(open('/tmp/health.json')).get('build',''))
+PY
+)"
+          expected="${GITHUB_SHA:0:12}"
+          echo "reported build=$build expected=$expected"
+          test "$build" = "$expected"
