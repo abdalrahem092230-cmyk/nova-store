@@ -1372,11 +1372,17 @@ const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, "http://localhost");
     if (["POST", "PATCH"].includes(req.method)) {
-      if (
-        req.headers.origin &&
-        new URL(req.headers.origin).host !== req.headers.host
-      )
-        return send(res, 403, "Forbidden");
+      const origin = String(req.headers.origin || "").trim();
+      if (origin && origin !== "null") {
+        let originHost = "";
+        try {
+          originHost = new URL(origin).host;
+        } catch {
+          return send(res, 403, "Forbidden");
+        }
+        if (originHost !== req.headers.host)
+          return send(res, 403, "Forbidden");
+      }
       if (!rateAllowed(req))
         return send(
           res,
