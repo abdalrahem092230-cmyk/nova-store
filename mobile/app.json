@@ -1,1 +1,38 @@
-{"expo":{"name":"Nova Store","slug":"nova-store-mobile","version":"1.0.0","orientation":"portrait","userInterfaceStyle":"dark","backgroundColor":"#090b0e","primaryColor":"#d8ff45","scheme":"novastore","android":{"package":"com.novastore.libya","versionCode":1,"permissions":[]},"ios":{"bundleIdentifier":"com.novastore.libya","supportsTablet":true}}}
+{
+  "expo": {
+    "name": "Nova Store",
+    "slug": "nova-store-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#090b0e",
+    "primaryColor": "#6848c7",
+    "scheme": "novastore",
+    "icon": "./assets/icon.png",
+    "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#090b0e",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 180,
+          "resizeMode": "contain"
+        }
+      ]
+    ],
+    "android": {
+      "package": "com.novastore.libya",
+      "versionCode": 1,
+      "permissions": [],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#30273f"
+      }
+    },
+    "ios": {
+      "bundleIdentifier": "com.novastore.libya",
+      "supportsTablet": true,
+      "icon": "./assets/icon.png"
+    }
+  }
+}
