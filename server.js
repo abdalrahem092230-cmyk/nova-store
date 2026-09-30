@@ -658,6 +658,59 @@ function send(res, n, b, t = "text/html; charset=utf-8", h = {}) {
 function red(res, x) {
   send(res, 302, "", "text/plain", { location: x });
 }
+function renderDiagnostics() {
+  const d = S();
+  const out = {
+    ok: true,
+    adminOrders: true,
+    accounts: true,
+    brokenAccounts: 0,
+    products: Array.isArray(d.products) ? d.products.length : -1,
+    orders: Array.isArray(d.orders) ? d.orders.length : -1,
+    customers: Array.isArray(d.customers) ? d.customers.length : 0,
+  };
+  try {
+    ADMIN_ORDERS.renderOrders(
+      d,
+      d.settings,
+      "all",
+      "",
+      "",
+      esc,
+      money,
+      normPhone,
+      "diagnostic",
+    );
+  } catch {
+    out.ok = false;
+    out.adminOrders = false;
+  }
+  try {
+    for (const customer of d.customers || []) {
+      try {
+        CUSTOMER.accountBody(
+          customer,
+          d,
+          d.settings,
+          esc,
+          money,
+          "",
+          "diagnostic",
+        );
+      } catch {
+        out.brokenAccounts++;
+      }
+    }
+    if (out.brokenAccounts) {
+      out.ok = false;
+      out.accounts = false;
+    }
+  } catch {
+    out.ok = false;
+    out.accounts = false;
+  }
+  return out;
+}
 async function handle(req, res) {
   if (
     process.env.NOVA_PREVIEW === "true" &&
@@ -770,6 +823,13 @@ async function handle(req, res) {
         accountSessions: "signed",
         adminSessions: "signed",
       }),
+      "application/json",
+    );
+  if (req.method === "GET" && p === "/health/render")
+    return send(
+      res,
+      200,
+      JSON.stringify(renderDiagnostics()),
       "application/json",
     );
   if (req.method === "GET" && ["/account/", "/admin/"].includes(p))
