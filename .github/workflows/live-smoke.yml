@@ -1,5 +1,7 @@
 name: Nova Live Smoke Test
 
+# diagnostics refresh
+
 on:
   push:
     branches:
