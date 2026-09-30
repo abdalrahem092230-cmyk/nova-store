@@ -264,6 +264,13 @@ function safeImage(value) {
     return false;
   }
 }
+function safeCookieValue(value) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
 function cookie(req) {
   return Object.fromEntries(
     (req.headers.cookie || "")
@@ -273,7 +280,7 @@ function cookie(req) {
         let i = x.indexOf("=");
         return i < 0
           ? [x.trim(), ""]
-          : [x.slice(0, i).trim(), decodeURIComponent(x.slice(i + 1))];
+          : [x.slice(0, i).trim(), safeCookieValue(x.slice(i + 1))];
       }),
   );
 }
