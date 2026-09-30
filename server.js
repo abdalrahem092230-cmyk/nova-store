@@ -835,6 +835,7 @@ async function handle(req, res) {
         storage: pool ? "postgres" : "file",
         accountSessions: "signed",
         adminSessions: "signed",
+        build: String(process.env.RENDER_GIT_COMMIT || "local").slice(0, 12),
       }),
       "application/json",
     );
@@ -1406,6 +1407,8 @@ const server = http.createServer(async (req, res) => {
           err.status === 413
             ? "حجم الطلب كبير جدًا."
             : "تعذر حفظ أو تحميل البيانات. حاول مجددًا.",
+        build: String(process.env.RENDER_GIT_COMMIT || "local").slice(0, 12),
+        path: req.url,
       }),
       "application/json",
     );
