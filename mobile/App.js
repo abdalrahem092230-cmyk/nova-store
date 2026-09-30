@@ -1,6 +1,5 @@
 import React,{useEffect,useMemo,useState}from'react';
-import{ActivityIndicator,Alert,Image,KeyboardAvoidingView,Modal,Platform,Pressable,SafeAreaView,ScrollView,StyleSheet,Text,TextInput,View}from'react-native';
-import{StatusBar}from'expo-status-bar';
+import{ActivityIndicator,Alert,Image,KeyboardAvoidingView,Modal,Platform,Pressable,SafeAreaView,ScrollView,StatusBar,StyleSheet,Text,TextInput,View}from'react-native';
 import Ionicons from'@expo/vector-icons/Ionicons';
 import * as NavigationBar from'expo-navigation-bar';
 import AsyncStorage from'@react-native-async-storage/async-storage';
