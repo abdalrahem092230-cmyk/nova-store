@@ -33,7 +33,9 @@ jobs:
           java-version: '17'
 
       - name: Install dependencies
-        run: npm install
+        run: |
+          npm install
+          npx expo install babel-preset-expo
 
       - name: Validate Expo project
         run: npx expo-doctor
