@@ -54,6 +54,20 @@ jobs:
           # Customer login endpoint should respond normally to invalid credentials.
           expect_status 401 -X POST             -H "content-type: application/x-www-form-urlencoded"             --data "phone=0929999999&password=definitely-wrong"             "$base/account/login"
 
+          # Verify the custom production domain reaches the same application.
+          custom="https://nova-store.l.cd"
+          expect_status 200 "$custom/health"
+          expect_status 200 "$custom/account/login"
+          expect_status 200 "$custom/admin/login"
+          expect_status 401 -X POST \
+            -H "content-type: application/x-www-form-urlencoded" \
+            --data "phone=0929999999&password=definitely-wrong" \
+            "$custom/account/login"
+          expect_status 401 -X POST \
+            -H "content-type: application/x-www-form-urlencoded" \
+            --data "email=smoke-test%40example.invalid&password=definitely-wrong" \
+            "$custom/admin/login"
+
       - name: Check health payload
         shell: bash
         run: |
