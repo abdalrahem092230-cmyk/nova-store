@@ -846,6 +846,13 @@ async function handle(req, res) {
       JSON.stringify(renderDiagnostics()),
       "application/json",
     );
+  if (req.method === "GET" && p === "/health/errors")
+    return send(
+      res,
+      200,
+      JSON.stringify({ ok: true, errors: recentErrors.slice(-10) }),
+      "application/json",
+    );
   if (req.method === "GET" && ["/account/", "/admin/"].includes(p))
     return red(res, p.slice(0, -1));
   if (req.method === "GET" && p === "/account/login")
@@ -1329,6 +1336,18 @@ async function handle(req, res) {
     ),
   );
 }
+const recentErrors = [];
+function rememberError(req, err) {
+  recentErrors.push({
+    at: new Date().toISOString(),
+    method: req.method,
+    path: String(req.url || "").split("?")[0],
+    name: String(err?.name || "Error").slice(0, 80),
+    code: String(err?.code || "").slice(0, 80),
+    build: String(process.env.RENDER_GIT_COMMIT || "local").slice(0, 12),
+  });
+  if (recentErrors.length > 20) recentErrors.splice(0, recentErrors.length - 20);
+}
 const attempts = new Map();
 function rateAllowed(req) {
   const key =
@@ -1392,6 +1411,7 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(...response.args);
     res.end(response.body);
   } catch (err) {
+    rememberError(req, err);
     console.error(
       "Request failed:",
       req.method,
