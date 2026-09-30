@@ -53,12 +53,6 @@ jobs:
 
           # Customer login endpoint should respond normally to invalid credentials.
           expect_status 401 -X POST             -H "content-type: application/x-www-form-urlencoded"             --data "phone=0929999999&password=definitely-wrong"             "$base/account/login"
-
-          # Verify the custom production domain reaches the same application.
-          custom="https://nova-store.l.cd"
-          expect_status 200 "$custom/health"
-          expect_status 200 "$custom/account/login"
-          expect_status 200 "$custom/admin/login"
           expect_status 401 -X POST \
             -H "content-type: application/x-www-form-urlencoded" \
             --data "phone=0929999999&password=definitely-wrong" \
@@ -67,6 +61,44 @@ jobs:
             -H "content-type: application/x-www-form-urlencoded" \
             --data "email=smoke-test%40example.invalid&password=definitely-wrong" \
             "$custom/admin/login"
+
+      - name: Custom domain health
+        shell: bash
+        run: |
+          code="$(curl -sS -o /tmp/body -w "%{http_code}" --max-time 20 https://nova-store.l.cd/health || true)"
+          echo "status=$code"
+          cat /tmp/body || true
+          test "$code" = "200"
+
+      - name: Custom domain account page
+        shell: bash
+        run: |
+          code="$(curl -sS -o /tmp/body -w "%{http_code}" --max-time 20 https://nova-store.l.cd/account/login || true)"
+          echo "status=$code"
+          test "$code" = "200"
+
+      - name: Custom domain admin page
+        shell: bash
+        run: |
+          code="$(curl -sS -o /tmp/body -w "%{http_code}" --max-time 20 https://nova-store.l.cd/admin/login || true)"
+          echo "status=$code"
+          test "$code" = "200"
+
+      - name: Custom domain account POST
+        shell: bash
+        run: |
+          code="$(curl -sS -o /tmp/body -w "%{http_code}" --max-time 20 -X POST             -H "content-type: application/x-www-form-urlencoded"             --data "phone=0929999999&password=definitely-wrong"             https://nova-store.l.cd/account/login || true)"
+          echo "status=$code"
+          cat /tmp/body || true
+          test "$code" = "401"
+
+      - name: Custom domain admin POST
+        shell: bash
+        run: |
+          code="$(curl -sS -o /tmp/body -w "%{http_code}" --max-time 20 -X POST             -H "content-type: application/x-www-form-urlencoded"             --data "email=smoke-test%40example.invalid&password=definitely-wrong"             https://nova-store.l.cd/admin/login || true)"
+          echo "status=$code"
+          cat /tmp/body || true
+          test "$code" = "401"
 
       - name: Check health payload
         shell: bash
