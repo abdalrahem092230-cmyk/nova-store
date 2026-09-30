@@ -113,7 +113,28 @@ async function boot() {
   });
 
   console.log('NOVA persistent storage connected to Neon PostgreSQL (primary)');
+
+  // Add the mobile API without changing the existing storefront server.
+  const http = require('http');
+  const mobileApi = require('./mobile-api');
+  const originalCreateServer = http.createServer;
+  http.createServer = function(listener) {
+    return originalCreateServer.call(http, async (req, res) => {
+      try {
+        if (await mobileApi.handle(req, res)) return;
+      } catch (err) {
+        console.error('Mobile API error:', err);
+        if (!res.headersSent) {
+          res.writeHead(500, {'content-type':'application/json; charset=utf-8'});
+          res.end(JSON.stringify({error:'Server Error'}));
+        }
+        return;
+      }
+      return listener(req, res);
+    });
+  };
   require('./server.js');
+  http.createServer = originalCreateServer;
 }
 
 boot().catch(err => {
