@@ -1,95 +1,1319 @@
-const STOREFRONT=require('./storefront');
-const http=require('http'),fs=require('fs'),path=require('path'),crypto=require('crypto');
-const {URL}=require('url');const LIBYA_AREAS=require('./libya-locations');const ADMIN_ORDERS=require('./admin-orders');const CUSTOMER=require('./customer-account');const CUSTOMER_SESSION_SECRET=process.env.CUSTOMER_SESSION_SECRET||crypto.randomBytes(32).toString('hex');const ADMIN_EMAIL=process.env.ADMIN_EMAIL||'',ADMIN_PASSWORD=process.env.ADMIN_PASSWORD||'';const PORT=+process.env.PORT||3000,DIR=process.env.DATA_DIR||path.join(__dirname,'data'),FILE=path.join(DIR,'store.json');fs.mkdirSync(DIR,{recursive:true});
-const seed={settings:{name:'نوفا ستور',en:'NOVA STORE',tag:'اختيارات عصرية، جودة تستحقها',currency:'د.ل',ship:15,free:250,wa:'218900000000'},products:[['p1','ساعة Urban Edge','إكسسوارات',189,239,18,'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=1000&q=85'],['p2','سماعات AirBeat Pro','تقنية',149,179,31,'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1000&q=85'],['p3','حقيبة City Carry','حقائب',219,0,12,'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=1000&q=85'],['p4','نظارة Noir Classic','إكسسوارات',99,129,24,'https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&w=1000&q=85'],['p5','عطر Velvet Night','عطور',169,199,9,'https://images.unsplash.com/photo-1541643600914-78b084683601?auto=format&fit=crop&w=1000&q=85'],['p6','حذاء Mono Run','أحذية',259,299,16,'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=1000&q=85']].map(x=>({id:x[0],name:x[1],cat:x[2],price:x[3],old:x[4],stock:x[5],img:x[6]})),orders:[]};
-if(!fs.existsSync(FILE))fs.writeFileSync(FILE,JSON.stringify(seed,null,2));let S=()=>{try{return JSON.parse(fs.readFileSync(FILE))}catch{return seed}},W=x=>{fs.writeFileSync(FILE,JSON.stringify(x,null,2))};
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),money=n=>new Intl.NumberFormat('ar-LY').format(+n||0),sessions=new Map();
-const css=`*{box-sizing:border-box}body{margin:0;background:#0b0d10;color:#f7f7f4;font-family:system-ui,-apple-system,Segoe UI,Arial;direction:rtl}a{color:inherit;text-decoration:none}button,input,select,textarea{font:inherit}.wrap{width:min(1180px,calc(100% - 26px));margin:auto}.top{background:#d8ff45;color:#10110d;text-align:center;padding:8px;font-weight:800;font-size:13px}.nav{position:sticky;top:0;z-index:5;background:#0b0d10e8;backdrop-filter:blur(15px);border-bottom:1px solid #252a32}.navin{height:72px;display:flex;align-items:center;justify-content:space-between}.brand{display:flex;gap:10px;align-items:center;font-weight:900}.logo{width:38px;height:38px;border-radius:12px;background:#d8ff45;color:#111;display:grid;place-items:center}.brand small{display:block;color:#8e95a2;font-size:10px;letter-spacing:2px}.btn{border:1px solid #303640;border-radius:13px;padding:11px 16px;background:#171b21;color:#fff;cursor:pointer;font-weight:800}.btn.hot{background:#d8ff45;color:#111;border-color:#d8ff45}.hero{padding:35px 0}.heroGrid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.heroBox,.heroImg{min-height:500px;border:1px solid #252a32;border-radius:28px;overflow:hidden}.heroBox{padding:55px;background:radial-gradient(circle at 0 0,#253213 0,transparent 40%),#12151a;display:flex;flex-direction:column;justify-content:center}.ey{color:#d8ff45;font-weight:900;font-size:12px;letter-spacing:2px}.hero h1{font-size:clamp(42px,7vw,76px);line-height:.98;margin:15px 0}.muted{color:#9aa1ad}.heroImg{position:relative}.heroImg img{width:100%;height:100%;object-fit:cover}.section{padding:45px 0}.head{display:flex;justify-content:space-between;gap:15px;align-items:end;margin-bottom:20px}.head h2{font-size:34px;margin:0}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}.card{background:#12151a;border:1px solid #252a32;border-radius:20px;overflow:hidden}.pic{aspect-ratio:1.1/1;overflow:hidden;position:relative}.pic img{width:100%;height:100%;object-fit:cover;transition:.35s}.card:hover img{transform:scale(1.04)}.sale{position:absolute;top:12px;right:12px;background:#d8ff45;color:#111;padding:6px 9px;border-radius:99px;font-weight:900;font-size:11px}.pad{padding:15px}.cat{font-size:11px;color:#8e95a2}.title{font-weight:900;margin:5px 0 10px}.price{font-size:20px;font-weight:950}.old{text-decoration:line-through;color:#777;margin-right:7px;font-size:12px}.features{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.feat{padding:19px;border:1px solid #252a32;border-radius:18px;background:#12151a}.feat b{display:block;margin:7px 0}.checkout,.adminbox{background:#12151a;border:1px solid #252a32;border-radius:22px;padding:22px}.field{display:flex;flex-direction:column;gap:6px;margin:10px 0}.input{background:#0d1014;border:1px solid #303640;border-radius:12px;color:#fff;padding:12px}.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}.row{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid #252a32;padding:12px 0}.toast{position:fixed;bottom:20px;left:20px;background:#d8ff45;color:#111;padding:12px 16px;border-radius:12px;font-weight:900;display:none}.footer{border-top:1px solid #252a32;padding:30px 0;color:#8e95a2;margin-top:40px}.adminnav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}.table{width:100%;border-collapse:collapse;min-width:760px}.table th,.table td{padding:10px;border-bottom:1px solid #252a32;text-align:right;font-size:13px}.scroll{overflow:auto}.danger{color:#ff8b95;border-color:#71333a;background:#281419}.ok{color:#d8ff45}.login{min-height:100vh;display:grid;place-items:center}.login .adminbox{width:min(430px,92vw)}@media(max-width:800px){.heroGrid{grid-template-columns:1fr}.heroBox,.heroImg{min-height:390px}.heroBox{padding:30px}.grid{grid-template-columns:repeat(2,1fr)}.features{grid-template-columns:1fr 1fr}.two{grid-template-columns:1fr}}@media(max-width:470px){.grid{grid-template-columns:1fr 1fr;gap:9px}.pad{padding:11px}.title{font-size:14px}.price{font-size:16px}.old{display:block;margin:2px 0}.hero h1{font-size:46px}.head{align-items:start;flex-direction:column}}
-/* Motion layer */
-@keyframes novaFadeUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}@keyframes novaFadeIn{from{opacity:0}to{opacity:1}}@keyframes novaFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}@keyframes novaGlow{0%,100%{box-shadow:0 0 0 rgba(216,255,69,0)}50%{box-shadow:0 0 34px rgba(216,255,69,.12)}}
-.heroCopy{animation:novaFadeUp .7s cubic-bezier(.2,.8,.2,1) both}.heroMedia{animation:novaFadeIn .9s ease both}.heroKicker{animation:novaFloat 4s ease-in-out 1s infinite}.trustItem,.whyCard,.productCard,.feat{animation:novaFadeUp .65s cubic-bezier(.2,.8,.2,1) both}.trustItem:nth-child(2),.productCard:nth-child(2),.whyCard:nth-child(2){animation-delay:.07s}.trustItem:nth-child(3),.productCard:nth-child(3),.whyCard:nth-child(3){animation-delay:.14s}.trustItem:nth-child(4),.productCard:nth-child(4),.whyCard:nth-child(4){animation-delay:.21s}.productCard:hover .productMedia img{transform:scale(1.055)}.btn.hot{transition:transform .2s ease,box-shadow .2s ease}.btn.hot:hover{transform:translateY(-2px);box-shadow:0 10px 28px rgba(216,255,69,.14)}.logo{animation:novaGlow 3.5s ease-in-out infinite}
-@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
-`;
-const proCss=`.navlinks{display:flex;align-items:center;gap:4px;margin-right:8px}.navlinks a{padding:10px 11px;border-radius:11px;color:#c8ced7;font-size:13px;font-weight:800}.navlinks a:hover{background:#151a21;color:#fff}.navsearch{margin-right:auto;display:flex;max-width:300px;flex:1}.navsearch input{width:100%;background:#0f1318;border:1px solid #2b323c;border-radius:13px;color:#fff;padding:10px 12px;outline:none}.navsearch input:focus{border-color:#59691e;box-shadow:0 0 0 3px rgba(216,255,69,.07)}.navactions{display:flex;gap:8px}.heroActions{display:flex;gap:9px;flex-wrap:wrap;margin-top:10px}.heroStats{display:flex;gap:24px;flex-wrap:wrap;margin-top:28px;padding-top:20px;border-top:1px solid #2a3039}.heroStats b{display:block;font-size:20px}.heroStats span{font-size:11px;color:#8e95a2}.card{transition:.25s;box-shadow:0 10px 30px rgba(0,0,0,.08)}.card:hover{transform:translateY(-4px);border-color:#3a424e;box-shadow:0 20px 55px rgba(0,0,0,.22)}.card .btn{transition:.2s}.card .btn:hover{transform:translateY(-1px)}.proSteps{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:18px}.proSteps span{padding:10px;border:1px solid #303640;border-radius:12px;text-align:center;color:#777;font-size:11px;font-weight:900}.proSteps span.on{background:#d8ff45;color:#111;border-color:#d8ff45}.footerGrid{display:grid;grid-template-columns:1.4fr .8fr .8fr;gap:28px}.footerGrid h4{color:#fff;margin:0 0 12px}.footerGrid a{display:block;margin:7px 0;font-size:13px}.footerBrand{font-weight:950;font-size:18px;color:#fff}.footerNote{line-height:1.8;max-width:520px}@media(max-width:960px){.navlinks{display:none}.navsearch{max-width:none}.footerGrid{grid-template-columns:1fr 1fr}}@media(max-width:700px){.navsearch{display:none}.footerGrid{grid-template-columns:1fr}.heroStats{gap:16px}.proSteps{grid-template-columns:1fr}.proSteps span{padding:8px}}`;
-
-const storefrontCss=`
-:root{--lime:#d8ff45;--bg:#090b0e;--panel:#11151a;--panel2:#151a20;--line:#252c34;--text:#f7f8f4;--muted:#929aa7}html{scroll-behavior:smooth;scroll-padding-top:90px}::selection{background:var(--lime);color:#111}:focus-visible{outline:2px solid var(--lime);outline-offset:3px}button:disabled{cursor:not-allowed}
-body{background:radial-gradient(circle at 85% -10%,rgba(216,255,69,.08),transparent 30%),var(--bg)}
-.top{font-size:12px;letter-spacing:.1px;padding:9px}
-.nav{background:rgba(9,11,14,.92);border-color:#20262e}
-.navin{height:76px;gap:14px}
-.logo{width:44px;height:44px;border-radius:15px;font-size:19px;box-shadow:0 8px 24px rgba(216,255,69,.16)}
-.brand{font-size:16px}.brand small{font-size:9px;letter-spacing:3px;margin-top:2px}
-.navlinks{gap:2px}.navlinks a{padding:10px 12px}
-.iconBtn{width:44px;height:44px;border-radius:14px;border:1px solid #303640;background:#141920;color:#fff;display:grid;place-items:center;cursor:pointer;font-weight:900}
-.cartBtn{display:flex;align-items:center;gap:8px;padding:10px 13px}
-.cartCount{min-width:22px;height:22px;padding:0 6px;border-radius:99px;background:var(--lime);color:#111;display:grid;place-items:center;font-size:11px;font-weight:950}
-.mobileMenu{display:none;position:relative}.mobileMenu summary{list-style:none}.mobileMenu summary::-webkit-details-marker{display:none}.mobilePanel{position:absolute;top:54px;left:0;width:220px;padding:10px;background:#11161c;border:1px solid #2a313a;border-radius:16px;box-shadow:0 18px 55px rgba(0,0,0,.45)}.mobilePanel a{display:block;padding:12px;border-radius:10px}.mobilePanel a:hover{background:#1a2027}
-.heroPremium{padding:28px 0 18px}.heroPremiumGrid{display:grid;grid-template-columns:1.02fr .98fr;gap:18px;align-items:stretch}
-.heroCopy,.heroMedia{border:1px solid var(--line);border-radius:30px;overflow:hidden;min-height:520px;position:relative}
-.heroCopy{padding:58px;background:radial-gradient(circle at 10% 10%,rgba(216,255,69,.15),transparent 32%),linear-gradient(145deg,#12171c,#0d1014);display:flex;flex-direction:column;justify-content:center}
-.heroKicker{display:inline-flex;align-items:center;gap:8px;width:max-content;padding:7px 11px;border:1px solid #35402a;border-radius:99px;color:var(--lime);background:rgba(216,255,69,.05);font-size:11px;font-weight:950;letter-spacing:.8px}
-.heroPremium h1{font-size:clamp(44px,6.8vw,78px);line-height:1.02;letter-spacing:-2.5px;margin:18px 0 16px;max-width:720px}.heroPremium p{font-size:17px;line-height:1.9;max-width:620px}
-.heroCtas{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}.heroCtas .btn{padding:13px 20px;border-radius:14px}
-.heroProof{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:30px}.proof{padding:14px;border:1px solid #27303a;border-radius:16px;background:rgba(255,255,255,.02)}.proof b{display:block;font-size:20px}.proof span{display:block;color:var(--muted);font-size:11px;margin-top:3px}
-.heroMedia{background:#dfe1e2}.heroMedia img{width:100%;height:100%;object-fit:cover;display:block}.heroMedia:after{content:"";position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.58),transparent 52%)}
-.heroProductInfo{position:absolute;z-index:2;right:22px;left:22px;bottom:22px;display:flex;align-items:end;justify-content:space-between;gap:10px}.heroProductInfo b{font-size:22px}.heroProductInfo span{font-size:12px;color:#e8ebec}.heroPrice{background:var(--lime);color:#111;padding:10px 13px;border-radius:12px;font-weight:950;white-space:nowrap}
-.trustStrip{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);border-radius:20px;background:#101419;overflow:hidden}.trustItem{padding:16px;display:flex;gap:10px;align-items:center}.trustItem+.trustItem{border-right:1px solid var(--line)}.trustIcon{width:36px;height:36px;border-radius:11px;background:#1b2117;color:var(--lime);display:grid;place-items:center}.trustItem b{display:block;font-size:13px}.trustItem span{display:block;font-size:10px;color:var(--muted);margin-top:2px}
-.sectionTitleRow{display:flex;align-items:end;justify-content:space-between;gap:12px;margin-bottom:18px}.sectionTitleRow h2{font-size:32px;margin:0}.sectionTitleRow p{margin:4px 0 0;color:var(--muted)}
-.categoryScroller{display:flex;gap:9px;overflow:auto;padding-bottom:5px;scrollbar-width:none}.categoryScroller::-webkit-scrollbar{display:none}.catChip{flex:0 0 auto;padding:12px 16px;border-radius:14px;border:1px solid #2a3139;background:#12171d;font-weight:850;font-size:13px}.catChip:hover,.catChip.active{border-color:var(--lime);color:#111;background:var(--lime)}
-.productGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.productCard{background:#11151a;border:1px solid #242b33;border-radius:22px;overflow:hidden;transition:.25s;position:relative}.productCard:hover{transform:translateY(-5px);border-color:#3a444f;box-shadow:0 22px 60px rgba(0,0,0,.25)}
-.productMedia{position:relative;aspect-ratio:1.1/1;overflow:hidden;background:#e7e7e7}.productMedia img{width:100%;height:100%;object-fit:cover;transition:.4s}.productCard:hover .productMedia img{transform:scale(1.045)}
-.productBadges{position:absolute;top:12px;right:12px;left:12px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px}.badge{padding:6px 9px;border-radius:99px;font-size:10px;font-weight:950;background:#0d1116dc;color:#fff;border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(8px)}.badge.discount{background:var(--lime);color:#111;border-color:var(--lime)}.badge.low{background:#ffc857;color:#111}.badge.out{background:#ff6978;color:#111}
-.productBody{padding:16px}.productCat{color:#89919d;font-size:10px;font-weight:850;letter-spacing:.4px}.productName{font-size:17px;font-weight:950;margin:6px 0 12px;line-height:1.35}.priceLine{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}.productPrice{font-size:21px;font-weight:950}.productOld{font-size:12px;color:#717986;text-decoration:line-through}.stockLine{margin-top:8px;color:#aab1ba;font-size:11px}.stockLine.good:before{content:"";width:7px;height:7px;border-radius:50%;background:var(--lime);display:inline-block;margin-left:6px}.stockLine.low:before{content:"";width:7px;height:7px;border-radius:50%;background:#ffc857;display:inline-block;margin-left:6px}
-.productActions{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:14px}.productActions .btn{padding:11px 12px}.productActions .btn.secondary{background:#0d1116}
-.promoBand{border:1px solid #30382f;border-radius:24px;background:linear-gradient(110deg,#d8ff45 0%,#b7e92e 100%);color:#111;padding:28px;display:flex;align-items:center;justify-content:space-between;gap:20px}.promoBand h3{font-size:28px;margin:0 0 6px}.promoBand p{margin:0;opacity:.75}.promoBand .btn{background:#111;color:#fff;border-color:#111}
-.whyGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.whyCard{padding:20px;border-radius:18px;background:#11151a;border:1px solid var(--line)}.whyCard .ico{font-size:22px}.whyCard b{display:block;margin:12px 0 6px}.whyCard span{font-size:12px;color:var(--muted);line-height:1.7}
-.filterPanel{padding:14px;border:1px solid var(--line);background:#101419;border-radius:18px;margin-bottom:18px}.filterPanel .two{align-items:end}.filterPanel .field{margin:0}.filterPanel label{font-size:11px;color:#aab1ba}.filterPanel .input{background:#0b0f13}.filterActions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-.mobileBar{display:none}
-.footer{padding:42px 0 92px;background:#090c10}.footerBrand{font-size:20px}.footerGrid{grid-template-columns:1.5fr .7fr .7fr;gap:36px}.footerGrid h4{font-size:13px;color:#fff}.footerGrid a{color:#aab1ba}.footerGrid a:hover{color:#fff}
-@media(max-width:960px){.heroPremiumGrid{grid-template-columns:1fr}.heroCopy,.heroMedia{min-height:430px}.navlinks{display:none}.mobileMenu{display:block}.navsearch{display:none}.productGrid{grid-template-columns:repeat(2,1fr)}.whyGrid{grid-template-columns:repeat(2,1fr)}.trustStrip{grid-template-columns:repeat(2,1fr)}.trustItem:nth-child(3){border-top:1px solid var(--line)}.trustItem:nth-child(4){border-top:1px solid var(--line)}}
-@media(max-width:650px){.wrap{width:min(100% - 22px,1180px)}.top{font-size:11px}.navin{height:68px}.brand>span:last-child{font-size:14px}.logo{width:40px;height:40px}.cartBtn{padding:9px 10px}.cartText{display:none}.heroPremium{padding-top:16px}.heroCopy{padding:32px 22px;min-height:430px;border-radius:24px}.heroMedia{min-height:360px;border-radius:24px}.heroPremium h1{font-size:48px;letter-spacing:-1.5px}.heroPremium p{font-size:14px;line-height:1.9}.heroProof{gap:7px}.proof{padding:11px}.proof b{font-size:17px}.proof span{font-size:9px}.trustStrip{border-radius:16px}.trustItem{padding:12px 10px}.trustIcon{width:32px;height:32px}.section{padding:34px 0}.sectionTitleRow h2{font-size:26px}.productGrid{gap:10px}.productCard{border-radius:17px}.productBody{padding:12px}.productName{font-size:14px;min-height:38px}.productPrice{font-size:17px}.productActions{grid-template-columns:1fr}.productActions .btn.secondary{display:none}.promoBand{padding:22px;align-items:flex-start;flex-direction:column}.promoBand h3{font-size:23px}.whyGrid{grid-template-columns:1fr 1fr;gap:9px}.whyCard{padding:15px}.mobileBar{position:fixed;display:grid;grid-template-columns:repeat(4,1fr);right:10px;left:10px;bottom:10px;z-index:20;background:rgba(16,20,25,.95);border:1px solid #2b333c;border-radius:18px;padding:7px;backdrop-filter:blur(16px);box-shadow:0 12px 40px rgba(0,0,0,.45)}.mobileBar a{display:grid;place-items:center;gap:2px;padding:6px 4px;border-radius:12px;font-size:9px;color:#aab1ba}.mobileBar a span:first-child{font-size:18px}.mobileBar a.hotMobile{background:var(--lime);color:#111}.footer{padding-bottom:110px}}
-.favBtn{position:absolute;left:12px;top:12px;width:36px;height:36px;border:1px solid rgba(255,255,255,.18);border-radius:12px;background:rgba(9,11,14,.72);color:#fff;display:grid;place-items:center;cursor:pointer;font-size:19px;backdrop-filter:blur(8px);z-index:2}.favBtn.active{background:var(--lime);color:#111;border-color:var(--lime)}.favBtn:hover{transform:scale(1.06)}.sortRow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px}.sortRow label{font-size:11px;color:var(--muted)}.sortRow select{min-width:170px}.emptyState{grid-column:1/-1;text-align:center;padding:44px 20px;border:1px dashed #39434e;border-radius:20px;color:var(--muted)}.emptyState b{display:block;color:#fff;font-size:18px;margin-bottom:7px}.navBadge{position:absolute;top:-5px;left:-5px;min-width:17px;height:17px;padding:0 4px;border-radius:99px;background:#ffcc57;color:#111;font-size:9px;font-weight:950;display:grid;place-items:center}.iconBtn{position:relative}.cartProgress{margin:14px 0;padding:13px 15px;border-radius:15px;background:linear-gradient(110deg,rgba(216,255,69,.12),rgba(216,255,69,.03));border:1px solid #35402a;color:#d8ff45;font-size:12px}.progressTrack{height:6px;background:#252c34;border-radius:99px;overflow:hidden;margin-top:9px}.progressTrack i{display:block;height:100%;background:var(--lime);border-radius:99px;transition:width .3s}@media(max-width:650px){.favBtn{width:32px;height:32px}.sortRow select{flex:1}}`;
-
-function page(title,body,extra=''){if(!body.includes('id="main-content"'))body=body.replace('<main','<main id="main-content"');let s=S().settings;return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#090b0e"><meta name="description" content="${esc(s.tag)}. تسوق سريع وواضح مع توصيل داخل ليبيا ومتابعة سهلة للطلب."><meta property="og:type" content="website"><meta property="og:title" content="${esc(title)} — ${esc(s.name)}"><meta property="og:description" content="${esc(s.tag)}"><meta property="og:url" content="https://nova-store-icxo.onrender.com/"><meta property="og:image" content="https://nova-store-icxo.onrender.com/nova-avatar.svg"><link rel="icon" type="image/svg+xml" href="/nova-avatar.svg"><link rel="apple-touch-icon" href="/nova-avatar.svg"><link rel="canonical" href="https://nova-store-icxo.onrender.com/"><title>${esc(title)} — ${esc(s.name)}</title><style>${css}${proCss}${storefrontCss}${CUSTOMER.accountCss()}${STOREFRONT.css}</style></head><body><a class="skipLink" href="#main-content">انتقل إلى المحتوى</a><div class="top">شحن مجاني للطلبات فوق ${money(s.free)} ${esc(s.currency)}</div><nav class="nav"><div class="wrap navin"><a class="brand" href="/"><span class="logo"><img src="/nova-avatar.svg" alt="" width="45" height="45"></span><span>${esc(s.name)}<small>${esc(s.en)}</small></span></a><div class="navlinks"><a href="/">الرئيسية</a><a href="/#shop">المنتجات</a><a href="/track">تتبع الطلب</a><a href="/account">حسابي</a></div><form class="navsearch" method="get" action="/"><input name="q" placeholder="ابحث عن منتج..." aria-label="ابحث عن منتج"></form><div class="navactions"><button class="iconBtn" type="button" onclick="toggleFavoritesView()" aria-label="عرض المفضلة">♡<span class="navBadge" id="fc">0</span></button><details class="mobileMenu"><summary class="iconBtn" aria-label="فتح القائمة">☰</summary><div class="mobilePanel"><a href="/">الرئيسية</a><a href="/#shop">المنتجات</a><a href="/track">تتبع الطلب</a><a href="/account">حسابي</a></div></details><a class="btn cartBtn" href="/checkout" aria-label="فتح السلة"><span>${STOREFRONT.icon('bag')}</span><span class="cartText">السلة</span><span class="cartCount" id="cc">0</span></a></div></div></nav>${body}<footer class="footer"><div class="wrap footerGrid"><div><div class="footerBrand">${esc(s.name)} · ${esc(s.en)}</div><p class="muted footerNote">${esc(s.tag)}. تسوق سريع وواضح مع توصيل داخل ليبيا ومتابعة سهلة للطلب.</p></div><div><h4>تسوّق</h4><a href="/">الرئيسية</a><a href="/#shop">كل المنتجات</a><a href="/checkout">السلة</a></div><div><h4>المساعدة</h4><a href="/track">تتبع الطلب</a><a href="/shipping">الشحن والتوصيل</a><a href="/returns">الاستبدال والاسترجاع</a><a href="/privacy">الخصوصية</a><a href="https://wa.me/${String(s.wa||'').replace(/\\D/g,'')}" target="_blank" rel="noopener">واتساب</a><span style="font-size:11px;color:#707884">© ${new Date().getFullYear()} ${esc(s.en)}</span></div></div></footer><nav class="mobileBar" style="grid-template-columns:repeat(5,1fr)"><a href="/"><span>${STOREFRONT.icon('home')}</span><span>الرئيسية</span></a><a href="/#shop"><span>${STOREFRONT.icon('grid')}</span><span>المنتجات</span></a><a class="hotMobile" href="/checkout"><span>${STOREFRONT.icon('bag')}</span><span>السلة</span></a><a href="/track"><span>${STOREFRONT.icon('track')}</span><span>تتبع</span></a><a href="/account"><span>${STOREFRONT.icon('user')}</span><span>حسابي</span></a></nav><div id="toast" class="toast" role="status" aria-live="polite">تمت الإضافة للسلة ✓</div><script>const readList=k=>{try{let v=JSON.parse(localStorage.getItem(k)||'[]');return Array.isArray(v)?v:[]}catch{return []}},get=()=>readList('novaCart'),favorites=()=>readList('novaFavorites'),set=x=>{localStorage.novaCart=JSON.stringify(x);count()},count=()=>{let e=document.getElementById('cc');if(e)e.textContent=get().reduce((a,x)=>a+x.q,0);let f=document.getElementById('fc');if(f)f.textContent=favorites().length||0;document.querySelectorAll('.favBtn').forEach(b=>b.classList.toggle('active',favorites().includes(b.dataset.id)))};function toggleFav(id){let f=favorites(),i=f.indexOf(id);i<0?f.push(id):f.splice(i,1);localStorage.novaFavorites=JSON.stringify(f);count();let t=document.getElementById('toast');if(t){t.textContent=i<0?'تمت الإضافة للمفضلة ♡':'تمت الإزالة من المفضلة';t.style.display='block';setTimeout(()=>t.style.display='none',1100)}}function toggleFavoritesView(){let cards=document.querySelectorAll('.productCard[data-id]');if(!cards.length){location.href='/?favorites=1#shop';return}let only=[...cards].some(c=>c.style.display!=='none'&&c.dataset.favoriteView!=='1');cards.forEach(c=>{c.dataset.favoriteView=only?'1':'0';c.style.display=!only||favorites().includes(c.dataset.id)?'':'none'});let shop=document.getElementById('shop');if(shop)shop.scrollIntoView({behavior:'smooth'})}function add(id,n,p,img,q=1){let c=get(),x=c.find(z=>z.id===id),qty=Math.max(1,Math.floor(+q||1));x?x.q+=qty:c.push({id,n,p,img,q:qty});set(c);let t=document.getElementById('toast');if(t){t.textContent='تمت الإضافة للسلة ✓';t.style.display='block';setTimeout(()=>t.style.display='none',1100)}}${extra}${STOREFRONT.script}</script></body></html>`}
-function home(req){return page('الرئيسية',STOREFRONT.home(S(),req,esc,money))}
-
-function productPage(req){let d=S(),s=d.settings,u=new URL(req.url,'http://x'),x=d.products.find(z=>z.id===u.searchParams.get('id'));if(!x)return page('المنتج غير موجود','<main class="section"><div class="wrap"><div class="adminbox"><h2>المنتج غير موجود</h2><a class="btn hot" href="/">العودة للمتجر</a></div></div></main>');let desc=x.desc||'منتج مختار من '+s.name+' بعناية، مع تجربة طلب سهلة ودعم مباشر عبر واتساب.',gallery=[x.img,...(Array.isArray(x.images)?x.images:[])].filter((v,i,a)=>v&&a.indexOf(v)===i).slice(0,8),related=d.products.filter(z=>z.id!==x.id&&z.cat===x.cat&&z.stock>0).slice(0,3),wa=String(s.wa||'').replace(/\D/g,'');return page(x.name,`<main class="section"><div class="wrap"><div class="heroGrid"><div><div class="heroImg" style="min-height:430px"><img id="productMainImage" src="${esc(gallery[0])}" alt="${esc(x.name)}" loading="eager"></div>${gallery.length>1?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">${gallery.map((img,i)=>`<button class="productThumb" type="button" onclick="setProductImage(${i})" style="padding:0;border:1px solid ${i===0?'#d8ff45':'#303640'};border-radius:10px;background:#12151a;overflow:hidden;cursor:pointer"><img src="${esc(img)}" alt="${esc(x.name)} صورة ${i+1}" style="width:64px;height:64px;object-fit:cover;display:block" loading="lazy"></button>`).join('')}</div>`:''}</div><div class="heroBox" style="min-height:430px;padding:35px"><div class="cat">${esc(x.cat)}</div><h1 style="font-size:clamp(32px,5vw,54px);margin:10px 0">${esc(x.name)}</h1><p class="muted" style="line-height:1.9">${esc(desc)}</p><div><span class="price">${money(x.price)} ${esc(s.currency)}</span>${x.old>x.price?`<span class="old">${money(x.old)} ${esc(s.currency)}</span>`:''}</div><p class="${x.stock>0?'ok':''}" style="${x.stock<=0?'color:#ff8b95':''}">${x.stock>0?'متوفر الآن · '+x.stock+' قطعة':'غير متوفر حاليًا'}</p>${x.stock>0?`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:16px 0"><label for="productQty" class="muted">الكمية</label><button class="btn" type="button" onclick="productQty.stepDown()">−</button><input class="input" id="productQty" type="number" min="1" max="${Math.max(1,x.stock)}" value="1" style="width:70px;text-align:center"><button class="btn" type="button" onclick="productQty.stepUp()">+</button></div>`:''}<div style="display:flex;gap:8px;flex-wrap:wrap">${x.stock>0?`<button class="btn hot" onclick='add(${JSON.stringify(x.id)},${JSON.stringify(x.name)},${x.price},${JSON.stringify(x.img)},document.getElementById("productQty").value)'>أضف للسلة</button>`:'<button class="btn" disabled style="opacity:.5">غير متوفر</button>'}<a class="btn" href="/checkout">اذهب للسلة</a>${wa?`<a class="btn" target="_blank" rel="noopener" href="https://wa.me/${wa}?text=${encodeURIComponent('مرحبًا، أريد الاستفسار عن '+x.name)}">اسأل عبر واتساب</a>`:''}<a class="btn" href="/">رجوع</a></div></div></div>${related.length?`<section class="section" style="padding-bottom:0"><div class="sectionTitleRow"><div><h2>منتجات مشابهة</h2><p>اختيارات أخرى من نفس القسم.</p></div></div><div class="productGrid">${related.map(z=>`<a class="productCard" href="/product?id=${encodeURIComponent(z.id)}"><div class="productMedia"><img src="${esc(z.img)}" alt="${esc(z.name)}" loading="lazy"></div><div class="productBody"><div class="productCat">${esc(z.cat)}</div><div class="productName">${esc(z.name)}</div><span class="productPrice">${money(z.price)} ${esc(s.currency)}</span></div></a>`).join('')}</div></section>`:''}</div></main>`,`const productImages=${JSON.stringify(gallery)};function setProductImage(i){let img=document.getElementById('productMainImage');if(img&&productImages[i]){img.src=productImages[i];document.querySelectorAll('.productThumb').forEach((b,n)=>b.style.borderColor=n===i?'#d8ff45':'#303640')}}`) }
-function checkout(req){let d=S(),s=d.settings,customer=CUSTOMER.sessionCustomer(req,d,CUSTOMER_SESSION_SECRET),pref=customer||{};return page('إتمام الطلب',`<main class="section"><div class="wrap" style="max-width:850px"><div class="head"><h2>إتمام الطلب</h2></div><div class="checkout"><div class="proSteps"><span class="on">1 · السلة</span><span class="on">2 · بيانات التوصيل</span><span>3 · تأكيد الطلب</span></div><div id="cart" aria-live="polite"></div><p class="muted" style="font-size:12px;margin-top:12px">بياناتك تستخدم فقط لتجهيز وتوصيل طلبك، ويمكنك متابعة الحالة برقم الطلب.</p><div class="two"><div class="field"><label>الاسم</label><input class="input" id="name" value="${esc(pref.name||'')}"></div><div class="field"><label>الهاتف</label><input class="input" id="phone" inputmode="numeric" autocomplete="tel" maxlength="10" pattern="09[0-9]{8}" placeholder="0920000000" value="${esc(pref.phone||'')}"><small class="muted">10 أرقام ويبدأ بـ 09</small></div></div><div class="two"><div class="field"><label>المدينة</label><select class="input" id="city"><option value="">اختر المدينة</option>${Object.keys(LIBYA_AREAS).map(c=>`<option value="${esc(c)}" ${c===pref.city?'selected':''}>${esc(c)}</option>`).join('')}</select></div><div class="field"><label>المنطقة / الحي</label><select class="input" id="area" ${pref.city?'':'disabled'}><option value="">اختر المنطقة / الحي</option>${(LIBYA_AREAS[pref.city]||[]).map(a=>`<option value="${esc(a)}" ${a===pref.area?'selected':''}>${esc(a)}</option>`).join('')}</select></div></div><div class="field"><label>تفاصيل العنوان</label><input class="input" id="address" placeholder="الشارع، رقم المنزل أو أقرب نقطة دالة" value="${esc(pref.address||'')}"><small class="muted">أضف وصفًا مختصرًا يساعد المندوب للوصول إليك.</small></div><div class="two"></div><div class="field"><label>ملاحظات</label><textarea class="input" id="notes"></textarea></div><button class="btn hot" id="orderBtn" type="button" onclick="order()">تأكيد الطلب</button><div id="msg"></div></div></div></main>`,`let cur=${JSON.stringify(s.currency)},ship=${+s.ship},free=${+s.free},areas=${JSON.stringify(LIBYA_AREAS)};let phoneEl=document.getElementById('phone'),citySel=document.getElementById('city'),areaSel=document.getElementById('area');phoneEl.addEventListener('input',()=>{phoneEl.value=phoneEl.value.replace(/[^0-9]/g,'').slice(0,10)});citySel.addEventListener('change',()=>{let list=areas[citySel.value]||[];areaSel.innerHTML='<option value="">اختر المنطقة / الحي</option>'+list.map(a=>'<option value="'+a+'">'+a+'</option>').join('');areaSel.disabled=!list.length});function qty(id,d){let c=get(),x=c.find(z=>z.id===id);if(!x)return;x.q+=d;if(x.q<=0)c=c.filter(z=>z.id!==id);set(c);render()}function del(id){set(get().filter(z=>z.id!==id));render()}function render(){let c=get(),e=document.getElementById('cart');if(!c.length){e.innerHTML='<p class="muted">السلة فارغة.</p>';return}let sub=c.reduce((a,x)=>a+x.p*x.q,0),sh=sub>=free?0:ship;let progress=free>0?Math.min(100,Math.round(sub/free*100)):100,remaining=Math.max(0,free-sub);let shippingNote=sh?'<div class=\"cartProgress\">باقي '+remaining.toFixed(0)+' '+cur+' لتحصل على شحن مجاني<div class=\"progressTrack\"><i style=\"width:'+progress+'%\"></i></div></div>':'<div class=\"cartProgress\">ممتاز، حصلت على الشحن المجاني ✓</div>';e.innerHTML=shippingNote+c.map(x=>'<div class="row" style="align-items:center"><div><b>'+x.n+'</b><div style="display:flex;gap:7px;align-items:center;margin-top:8px"><button class="btn" style="padding:6px 10px" onclick="qty(\\''+x.id+'\\',-1)">−</button><span>'+x.q+'</span><button class="btn" style="padding:6px 10px" onclick="qty(\\''+x.id+'\\',1)">+</button><button class="btn danger" style="padding:6px 10px" onclick="del(\\''+x.id+'\\')">حذف</button></div></div><b>'+((x.p*x.q).toFixed(0))+' '+cur+'</b></div>').join('')+'<div class="row"><span>الشحن</span><b>'+(sh?sh+' '+cur:'مجاني')+'</b></div><div class="row"><b>الإجمالي</b><b>'+((sub+sh).toFixed(0))+' '+cur+'</b></div>'}async function order(){let c=get(),msg=document.getElementById('msg'),btn=document.getElementById('orderBtn');if(window.novaOrderBusy)return;if(!c.length){msg.innerHTML='<p style="color:#ff8b95">السلة فارغة.</p>';return}let nameEl=document.getElementById('name'),phoneEl=document.getElementById('phone'),cityEl=document.getElementById('city'),areaEl=document.getElementById('area'),addressEl=document.getElementById('address'),notesEl=document.getElementById('notes');let o={name:(nameEl.value||'').trim(),phone:(phoneEl.value||'').trim(),city:(cityEl.value||'').trim(),area:(areaEl.value||'').trim(),address:(addressEl.value||'').trim(),notes:(notesEl.value||'').trim(),items:c.map(x=>({id:x.id,q:x.q}))};if(!o.name||!o.phone||!o.city||!o.area||!o.address){msg.innerHTML='<p style="color:#ff8b95">اكتب الاسم والهاتف والمدينة والمنطقة والعنوان قبل تأكيد الطلب.</p>';return}if(!/^09[0-9]{8}$/.test(o.phone)){msg.innerHTML='<p style="color:#ff8b95">رقم الهاتف يجب أن يكون 10 أرقام ويبدأ بـ 09، مثال: 0920000000.</p>';phoneEl.focus();return}window.novaOrderBusy=true;if(btn){btn.disabled=true;btn.textContent='جارٍ إرسال الطلب...'}try{let r=await fetch('/order',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(o)}),j=await r.json();if(r.ok){localStorage.removeItem('novaCart');count();msg.innerHTML='<div class="adminbox" style="margin-top:16px"><p class="ok">تم استلام طلبك بنجاح ✓</p><p>رقم الطلب: <b>'+j.id+'</b></p><p class="muted">احتفظ برقم الطلب لمتابعة حالته.</p><a class="btn hot" href="/track?order='+encodeURIComponent(j.id)+'">تتبع الطلب</a></div>';render()}else msg.innerHTML='<p style="color:#ff8b95">'+(j.error||'تعذر إرسال الطلب، حاول مرة أخرى.')+'</p>'}catch(e){msg.innerHTML='<p style="color:#ff8b95">تعذر الاتصال بالمتجر الآن. تأكد من الإنترنت وحاول مرة أخرى.</p>'}finally{window.novaOrderBusy=false;if(btn){btn.disabled=false;btn.textContent='تأكيد الطلب'}}}render();`)}
-function cookie(req){return Object.fromEntries((req.headers.cookie||'').split(';').filter(Boolean).map(x=>{let i=x.indexOf('=');return i<0?[x.trim(),'']:[x.slice(0,i).trim(),decodeURIComponent(x.slice(i+1))]}))}function ses(req){let c=cookie(req),s=sessions.get(c.sid);if(!s)return null;if(Date.now()-s.at>28800000){sessions.delete(c.sid);return null}return s}function csrfOk(req,token){let s=ses(req),a=Buffer.from(String(s?.csrf||'')),b=Buffer.from(String(token||''));return a.length>0&&a.length===b.length&&crypto.timingSafeEqual(a,b)}
-function normPhone(v){let p=String(v||'').replace(/\D/g,'');if(p.startsWith('00'))p=p.slice(2);if(p.startsWith('0'))p='218'+p.slice(1);return p}function validCheckoutPhone(v){return /^09[0-9]{8}$/.test(String(v||'').trim())}function validLocation(city,area){return Array.isArray(LIBYA_AREAS[city])&&LIBYA_AREAS[city].includes(area)}
-
-async function notifyTelegram(order,settings){
-  const token=process.env.TELEGRAM_BOT_TOKEN,chatId=process.env.TELEGRAM_CHAT_ID;
-  if(!token||!chatId)return;
-  const lines=[
-    '🛍️ طلب جديد في NOVA STORE',
-    '',
-    'رقم الطلب: '+order.id,
-    'العميل: '+order.name,
-    'الهاتف: '+order.phone,
-    'المدينة: '+order.city,
-    'المنطقة: '+(order.area||'-'),
-    'العنوان: '+order.address,
-    '',
-    ...(order.items||[]).map(i=>'• '+i.name+' × '+i.q),
-    '',
-    'الإجمالي: '+order.total+' '+(settings.currency||'د.ل')
-  ];
-  try{
-    const host='api.'+'telegram.org';
-    const url='https://'+host+'/bot'+token+'/sendMessage';
-    await fetch(url,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({chat_id:chatId,text:lines.join('\n')})});
-  }catch(e){console.error('Telegram notify failed:',e.message)}
+const STOREFRONT = require("./storefront");
+const VIEWS = require("./views");
+const http = require("http"),
+  fs = require("fs"),
+  path = require("path"),
+  crypto = require("crypto");
+const { URL } = require("url");
+const LIBYA_AREAS = require("./libya-locations");
+const ADMIN_ORDERS = require("./admin-orders");
+const CUSTOMER = require("./customer-account");
+const MOBILE = require("./mobile-api");
+const CUSTOMER_SESSION_SECRET =
+  process.env.CUSTOMER_SESSION_SECRET || crypto.randomBytes(32).toString("hex");
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "",
+  ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "";
+const PORT = +process.env.PORT || 3000,
+  DIR = process.env.DATA_DIR || path.join(__dirname, "data"),
+  FILE = path.join(DIR, "store.json");
+fs.mkdirSync(DIR, { recursive: true });
+const seed = {
+  settings: {
+    name: "نوفا ستور",
+    en: "NOVA STORE",
+    tag: "اختيارات عصرية، جودة تستحقها",
+    currency: "د.ل",
+    ship: 15,
+    free: 250,
+    wa: "218900000000",
+  },
+  products: [
+    [
+      "p1",
+      "ساعة Urban Edge",
+      "إكسسوارات",
+      189,
+      239,
+      18,
+      "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=1000&q=85",
+    ],
+    [
+      "p2",
+      "سماعات AirBeat Pro",
+      "تقنية",
+      149,
+      179,
+      31,
+      "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1000&q=85",
+    ],
+    [
+      "p3",
+      "حقيبة City Carry",
+      "حقائب",
+      219,
+      0,
+      12,
+      "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=1000&q=85",
+    ],
+    [
+      "p4",
+      "نظارة Noir Classic",
+      "إكسسوارات",
+      99,
+      129,
+      24,
+      "https://images.unsplash.com/photo-1511499767150-a48a237f0083?auto=format&fit=crop&w=1000&q=85",
+    ],
+    [
+      "p5",
+      "عطر Velvet Night",
+      "عطور",
+      169,
+      199,
+      9,
+      "https://images.unsplash.com/photo-1541643600914-78b084683601?auto=format&fit=crop&w=1000&q=85",
+    ],
+    [
+      "p6",
+      "حذاء Mono Run",
+      "أحذية",
+      259,
+      299,
+      16,
+      "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=1000&q=85",
+    ],
+  ].map((x) => ({
+    id: x[0],
+    name: x[1],
+    cat: x[2],
+    price: x[3],
+    old: x[4],
+    stock: x[5],
+    img: x[6],
+  })),
+  orders: [],
+};
+const Store = require("./storage");
+const COMMERCE = require("./commerce");
+const databaseUrl =
+  process.env.NEON_DATABASE_URL ||
+  (process.env.NOVA_PREVIEW === "true" ? null : process.env.DATABASE_URL);
+if (
+  process.env.RENDER === "true" &&
+  !databaseUrl &&
+  process.env.NOVA_PREVIEW !== "true"
+)
+  throw Error("A durable production database is required");
+const pool = databaseUrl
+  ? new (require("pg").Pool)({
+      connectionString: databaseUrl,
+      max: 5,
+      connectionTimeoutMillis: 10000,
+      idleTimeoutMillis: 30000,
+      ssl:
+        process.env.PGSSL === "true" ? { rejectUnauthorized: true } : undefined,
+    })
+  : null;
+pool?.on("error", () => console.error("Database connection interrupted"));
+const storage = new Store({ file: FILE, seed, pool });
+const S = () => storage.read(),
+  W = (x) => storage.write(x);
+const mobile = MOBILE.create({
+  readState: () => storage.read(),
+  writeState: (d) => storage.write(d),
+  afterCommit: (fn) => storage.afterCommit(fn),
+});
+const esc = (s) =>
+    String(s ?? "").replace(
+      /[&<>"']/g,
+      (c) =>
+        ({
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
+          "'": "&#39;",
+        })[c],
+    ),
+  money = (n) => new Intl.NumberFormat("ar-LY-u-nu-latn").format(+n || 0),
+  sessions = new Map();
+const css = `.features{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}.feat{padding:20px;border:1px solid var(--line);border-radius:12px}.feat b{display:block;margin:8px 0;font-size:21px}.feat .muted{font-size:11px}.adminnav{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:20px}.table{width:100%;border-collapse:collapse;min-width:720px}.table th,.table td{padding:14px;border-bottom:1px solid var(--line);text-align:right;font-size:12px}.scroll{overflow:auto}.login{min-height:100vh;display:grid;place-items:center}.login .adminbox{width:min(430px,92vw)}@media(max-width:700px){.features{grid-template-columns:1fr 1fr}}`;
+const proCss = "";
+function page(title, body, extra = "", meta = {}) {
+  if (process.env.NOVA_PREVIEW === "true") meta = { ...meta, noindex: true };
+  if (/حساب|دخول/.test(title) && !meta.path)
+    meta = { ...meta, path: "/account", noindex: true };
+  const s = S().settings,
+    base = "https://nova-store-icxo.onrender.com",
+    canonical = base + (meta.path || "/"),
+    description = meta.description || s.tag,
+    icon = STOREFRONT.icon;
+  const catalog = S()
+    .products.filter((p) => !p.archivedAt)
+    .map(({ id, name, price, stock, img }) => ({
+      id,
+      name,
+      price,
+      stock,
+      img,
+    }));
+  const structured = meta.product
+    ? {
+        "@context": "https://schema.org",
+        "@type": "Product",
+        name: meta.product.name,
+        image: meta.product.img,
+        description: meta.product.desc || meta.product.name,
+        sku: meta.product.id,
+        offers: {
+          "@type": "Offer",
+          priceCurrency: "LYD",
+          price: meta.product.price,
+          availability:
+            "https://schema.org/" +
+            (meta.product.stock > 0 ? "InStock" : "OutOfStock"),
+          url: canonical,
+        },
+      }
+    : null;
+  const wa = String(s.wa || "").replace(/\D/g, "");
+  return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#243d31"><meta name="description" content="${esc(description)}"><meta property="og:type" content="${meta.product ? "product" : "website"}"><meta property="og:locale" content="ar_LY"><meta property="og:title" content="${esc(title)} — ${esc(s.name)}"><meta property="og:description" content="${esc(description)}"><meta property="og:url" content="${esc(canonical)}">${meta.image ? `<meta property="og:image" content="${esc(meta.image)}">` : ""}<link rel="canonical" href="${esc(canonical)}">${meta.noindex ? '<meta name="robots" content="noindex,nofollow">' : ""}<link rel="icon" href="/nova-avatar.svg" type="image/svg+xml"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;500;600;700;800&display=swap" rel="stylesheet"><title>${esc(title)} — ${esc(s.name)}</title><style>${CUSTOMER.accountCss()}${STOREFRONT.css}</style>${structured ? `<script type="application/ld+json">${VIEWS.json(structured)}</script>` : ""}</head><body><a class="skipLink" href="#main-content">انتقل إلى المحتوى</a><div class="top">${process.env.NOVA_PREVIEW === "true" ? "نسخة معاينة تجريبية — لا تستقبل طلبات · " : ""}${s.free > 0 ? `شحن مجاني للطلبات من ${money(s.free)} ${esc(s.currency)}` : "اختيارات نوفا، توصل لبابك"}<span> / </span><b class="desktopOnly">تفاصيل صغيرة. يوم أجمل.</b></div><header class="nav"><div class="wrap navin"><a class="brand" href="/" aria-label="${esc(s.name)} — الرئيسية"><img class="logo logoImg" src="/nova-avatar.svg" alt="" width="42" height="42"><span>${esc(s.name)}<small>${esc(s.en)}</small></span></a><nav class="navlinks" aria-label="القائمة الرئيسية"><a href="/">الرئيسية</a><a href="/#shop">المجموعة</a><a href="/?sale=1#shop">التخفيضات</a><a href="/track">تتبّع طلبك</a></nav><form class="navsearch" action="/#shop" method="get"><input name="q" aria-label="ابحث عن منتج" placeholder="ابحث عن شيء تحبّه"><button type="submit" aria-label="بحث">${icon("search")}</button></form><div class="navactions"><a class="iconBtn desktopOnly" href="/account" aria-label="حسابي">${icon("user")}</a><button class="iconBtn" type="button" onclick="toggleFavoritesView()" aria-label="عرض المفضلة">${icon("heart")}<span class="navBadge" id="fc">0</span></button><a class="cartBtn" href="/checkout" aria-label="فتح السلة">${icon("bag")}<span class="cartText">السلة</span><span class="cartCount" data-cart-count>0</span></a><details class="mobileMenu"><summary class="iconBtn" aria-label="فتح القائمة">${icon("menu")}</summary><nav class="mobilePanel"><a href="/">الرئيسية</a><a href="/#shop">المجموعة</a><a href="/?sale=1#shop">التخفيضات</a><a href="/track">تتبّع طلبك</a><a href="/account">حسابي</a></nav></details></div></div></header>${body}<footer class="footer"><div class="wrap footerGrid"><div><div class="footerBrand">${esc(s.name)}<small style="display:block;font-size:10px;letter-spacing:3px">${esc(s.en)}</small></div><p class="footerNote muted">تفاصيل صغيرة تختارها لنفسك، وقطع تحب تهديها.<br>مساحتك لاكتشاف شيء يشبهك، كل يوم.</p></div><div><h4>خذ لفة في نوفا</h4><a href="/#shop">كل المجموعة</a><a href="/?sale=1#shop">التخفيضات</a><a href="/?favorites=1#shop">المفضلة</a><a href="/account">حسابي</a></div><div><h4>نحن هنا لمساعدتك</h4><a href="/track">تتبّع الطلب</a><a href="/shipping">الشحن والتوصيل</a><a href="/returns">الاستبدال والاسترجاع</a><a href="/privacy">الخصوصية</a>${wa ? `<a href="https://wa.me/${wa}" target="_blank" rel="noopener">تواصل عبر واتساب ↗</a>` : ""}</div></div><div class="wrap footerBottom"><span>© ${new Date().getFullYear()} ${esc(s.en)}. جميع الحقوق محفوظة.</span><span>اختيارات يومية. بطابع مختلف.</span></div></footer><nav class="mobileBar" aria-label="التنقل السريع">${[
+    ["home", "/", "الرئيسية"],
+    ["grid", "/#shop", "المجموعة"],
+    ["bag", "/checkout", "السلة"],
+    ["heart", "/?favorites=1#shop", "المفضلة"],
+    ["user", "/account", "حسابي"],
+  ]
+    .map(
+      ([i, h, t]) =>
+        `<a class="${i === "bag" ? "hotMobile" : ""}" href="${h}">${icon(i)}<span>${t}</span></a>`,
+    )
+    .join(
+      "",
+    )}</nav><div class="toast" id="toast" role="status" aria-live="polite"></div><script>let novaCatalog=${VIEWS.json(catalog)},novaSettings=${VIEWS.json({ currency: s.currency, ship: s.ship, free: s.free })};${STOREFRONT.script}
+${extra}</script></body></html>`;
+}
+function home(req) {
+  return page(
+    "الرئيسية",
+    STOREFRONT.home(
+      { ...S(), products: S().products.filter((p) => !p.archivedAt) },
+      req,
+      esc,
+      money,
+    ),
+  );
 }
 
-function statusMessage(o,s){if(o.status==='ملغي')return 'تم إلغاء طلبك. إذا كان هذا غير متوقع تواصل معنا عبر واتساب.';if(o.status==='جديد')return 'استلمنا طلبك وسنراجعه ونتواصل معك للتأكيد.';if(o.status==='مؤكد')return 'تم تأكيد طلبك.';if(o.status==='قيد التجهيز')return 'طلبك الآن قيد التجهيز.';if(o.status==='قيد التوصيل')return 'طلبك خرج للتوصيل وهو في الطريق إليك.';if(o.status==='مكتمل')return 'تم تسليم الطلب بنجاح. شكرًا لاختيارك '+s.name+'.';return 'حالة الطلب: '+o.status}
-function track(req){let d=S(),s=d.settings,u=new URL(req.url,'http://x'),id=(u.searchParams.get('order')||'').trim(),phone=(u.searchParams.get('phone')||'').trim(),o=null;if(id&&phone){o=d.orders.find(x=>String(x.id).toLowerCase()===id.toLowerCase()&&normPhone(x.phone)===normPhone(phone))}let steps=['جديد','مؤكد','قيد التجهيز','قيد التوصيل','مكتمل'],idx=o?steps.indexOf(o.status):-1;let result='';if(id&&phone&&!o)result='<div class="adminbox" style="margin-top:16px;border-color:#71333a"><b style="color:#ff8b95">لم نجد طلبًا بهذه البيانات.</b><p class="muted">تأكد من رقم الطلب ورقم الهاتف المستخدم عند الشراء.</p></div>';if(o){let timeline=o.status==='ملغي'?'<div class="adminbox" style="margin-top:16px;border-color:#71333a"><b style="color:#ff8b95">الطلب ملغي</b></div>':'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:16px">'+steps.map((z,i)=>'<div style="padding:12px 8px;border-radius:14px;text-align:center;border:1px solid '+(i<=idx?'#d8ff45':'#303640')+';background:'+(i<=idx?'#1b2111':'#12151a')+';color:'+(i<=idx?'#d8ff45':'#777')+';font-weight:900;font-size:12px">'+z+'</div>').join('')+'</div>';result='<div class="adminbox" style="margin-top:16px"><div class="row"><span>رقم الطلب</span><b>'+esc(o.id)+'</b></div><div class="row"><span>الحالة</span><b class="ok">'+esc(o.status)+'</b></div>'+timeline+'<p style="font-weight:800;margin-top:18px">'+esc(statusMessage(o,s))+'</p><div class="row"><span>الإجمالي</span><b>'+money(o.total)+' '+esc(s.currency)+'</b></div><div class="row"><span>المدينة</span><b>'+esc(o.city)+'</b></div><a class="btn hot" target="_blank" rel="noopener" href="https://wa.me/'+encodeURIComponent(String(s.wa||'').replace(/\D/g,''))+'?text='+encodeURIComponent('مرحبًا، أريد الاستفسار عن طلبي رقم '+o.id)+'">تواصل معنا عبر واتساب</a></div>'}return page('تتبع الطلب','<main class="section"><div class="wrap" style="max-width:760px"><div class="head"><div><h2>تتبع طلبك</h2><div class="muted">اكتب رقم الطلب ورقم الهاتف الذي استخدمته عند الشراء</div></div></div><form class="checkout" method="get" action="/track"><div class="two"><div class="field"><label>رقم الطلب</label><input class="input" name="order" value="'+esc(id)+'" placeholder="ORD-..." required></div><div class="field"><label>رقم الهاتف</label><input class="input" name="phone" value="'+esc(phone)+'" placeholder="09..." required></div></div><button class="btn hot">عرض حالة الطلب</button></form>'+result+'</div></main>')}
-function csvCell(value){let text=String(value??'');if(/^[=+\-@]/.test(text))text="'"+text;return '"'+text.replace(/"/g,'""')+'"'}
-function exportOrdersCsv(req){let d=S(),u=new URL(req.url,'http://x'),filter=u.searchParams.get('of')||'all',q=(u.searchParams.get('oq')||'').trim().toLowerCase(),city=(u.searchParams.get('city')||'').trim(),orders=d.orders.filter(o=>!o.archivedAt).slice().reverse().filter(o=>(filter==='all'||(filter==='new'&&o.readAt===null)||(filter==='active'&&!['مكتمل','ملغي'].includes(o.status))||(filter==='done'&&o.status==='مكتمل')||(filter==='cancel'&&o.status==='ملغي'))&&(!q||[o.id,o.name,o.phone,o.city,o.area].join(' ').toLowerCase().includes(q))&&(!city||o.city===city));let rows=[['رقم الطلب','التاريخ','الاسم','الهاتف','المدينة','المنطقة','الحالة','الإجمالي','ملاحظات']].concat(orders.map(o=>[o.id,new Date(o.created).toLocaleString('ar-LY'),o.name,o.phone,o.city,o.area||'',o.status,o.total,o.notes||'']));return '\uFEFF'+rows.map(row=>row.map(csvCell).join(',')).join('\r\n')+'\r\n'}
-function infoPage(kind){let data={shipping:{title:'الشحن والتوصيل',heading:'الشحن والتوصيل',intro:'نوصل طلبك داخل ليبيا بعد تأكيد البيانات معك.',sections:[['تكلفة الشحن','تُحسب تكلفة الشحن حسب إعدادات المتجر وتظهر لك بوضوح قبل تأكيد الطلب.'],['مدة التوصيل','نتواصل معك بعد استلام الطلب لتأكيد العنوان والوقت المناسب للتوصيل.'],['استلام الطلب','فضلاً تأكد من صحة رقم الهاتف والعنوان، وكن متاحًا للرد على المندوب عند وصول الطلب.']]},returns:{title:'الاستبدال والاسترجاع',heading:'الاستبدال والاسترجاع',intro:'هدفنا أن تكون تجربتك واضحة وعادلة.',sections:[['قبل الاستلام','إذا لاحظت مشكلة واضحة في المنتج عند الاستلام، تواصل معنا فورًا عبر واتساب مع رقم الطلب.'],['الاستبدال','نراجع كل حالة حسب نوع المنتج وحالته، ويجب أن يكون المنتج غير مستخدم ومحافظًا على تغليفه قدر الإمكان.'],['الاسترجاع','تواصل معنا خلال أقرب وقت من الاستلام لبحث طلب الاسترجاع وتحديد الخطوات المناسبة.']]},privacy:{title:'الخصوصية',heading:'سياسة الخصوصية',intro:'نستخدم بياناتك فقط لتجهيز الطلب وتحسين خدمة المتجر.',sections:[['البيانات التي نطلبها','الاسم ورقم الهاتف والمدينة والمنطقة والعنوان والملاحظات اللازمة للتوصيل.'],['طريقة الاستخدام','تُستخدم البيانات للتواصل معك، تجهيز الطلب، توصيله، وتمكينك من متابعة حالته.'],['الحماية','لا نبيع بيانات العملاء ولا نستخدمها خارج تشغيل المتجر وخدمة الطلبات. يمكنك التواصل معنا لطلب تصحيح بياناتك.']]}}[kind];if(!data)return page('الصفحة غير موجودة','<main class="section"><div class="wrap"><div class="adminbox"><h2>الصفحة غير موجودة</h2></div></div></main>');return page(data.title,`<main class="section"><div class="wrap" style="max-width:820px"><div class="head"><div><h1>${data.heading}</h1><p class="muted">${data.intro}</p></div></div><div class="adminbox">${data.sections.map(([h,b])=>`<section style="padding:8px 0 18px"><h3>${h}</h3><p class="muted" style="line-height:2">${b}</p></section>`).join('')}<p class="muted" style="border-top:1px solid #252a32;padding-top:16px">للاستفسار عن طلب محدد، تواصل معنا عبر واتساب من رابط المساعدة في أسفل الصفحة.</p></div></div></main>`)}
-const adminLoginAttempts=new Map();function adminLoginAllowed(req){let ip=req.socket.remoteAddress||'unknown',now=Date.now(),x=adminLoginAttempts.get(ip);if(!x||now-x.start>900000){adminLoginAttempts.set(ip,{start:now,count:1});return true}if(x.count>=10)return false;x.count++;return true}function admin(req,msg=''){let session=ses(req);if(!session)return `<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}${proCss}</style></head><body class="login"><form class="adminbox" method="post" action="/admin/login"><div class="brand"><span class="logo">N</span><span>لوحة إدارة NOVA</span></div><h2>دخول المالك</h2>${msg?`<p style="color:#ff8b95">${esc(msg)}</p>`:''}<div class="field"><label>البريد</label><input class="input" name="email" required></div><div class="field"><label>كلمة المرور</label><input class="input" type="password" name="password" required></div><button class="btn hot">دخول</button></form></body></html>`;let token=session?.csrf||'',d=S(),s=d.settings,u=new URL(req.url,'http://x'),edit=d.products.find(x=>x.id===u.searchParams.get('edit')),cloudName=process.env.CLOUDINARY_CLOUD_NAME||'',uploadPreset=process.env.CLOUDINARY_UPLOAD_PRESET||'',revenue=d.orders.filter(o=>o.status==='مكتمل').reduce((a,o)=>a+(+o.total||0),0),active=d.orders.filter(o=>!['مكتمل','ملغي'].includes(o.status)).length,low=d.products.filter(x=>x.stock<=3).length,unread=d.orders.filter(o=>o.readAt===null&&!o.archivedAt).length,orderFilter=(u.searchParams.get('of')||'all'),orderQ=(u.searchParams.get('oq')||'').trim(),orderCity=(u.searchParams.get('city')||'').trim();return `<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}${proCss}${ADMIN_ORDERS.css}</style><title>لوحة الإدارة</title></head><body><main class="section"><div class="wrap"><div class="head"><div><h2>لوحة إدارة NOVA</h2><div class="muted">${d.products.length} منتجات · ${d.orders.length} طلبات</div></div><a class="btn" href="/">عرض المتجر</a></div><div class="adminnav"><a class="btn" href="#products">المنتجات</a><a class="btn" href="#orders">الطلبات ${unread?`<span class="badgeCount">${unread}</span>`:""}</a><a class="btn" href="#settings">الإعدادات</a><form method="post" action="/admin/logout"><input type="hidden" name="csrf" value="${token}"><button class="btn danger">خروج</button></form></div><div class="features" style="margin-bottom:16px"><div class="feat">💰<b>${money(revenue)} ${esc(s.currency)}</b><span class="muted">مبيعات مكتملة</span></div><div class="feat">🧾<b>${active}</b><span class="muted">طلبات نشطة</span></div><div class="feat">📦<b>${d.products.length}</b><span class="muted">منتجات</span></div><div class="feat">⚠️<b>${low}</b><span class="muted">مخزون منخفض</span></div></div>${msg?`<p class="ok">${esc(msg)}</p>`:''}<section id="products" class="adminbox"><h3>${edit?'تعديل المنتج':'إضافة منتج'}</h3><form method="post" action="/admin/product"><input type="hidden" name="csrf" value="${token}"><input type="hidden" name="id" value="${esc(edit?.id||'')}"><div class="two"><div class="field"><label>الاسم</label><input class="input" name="name" value="${esc(edit?.name||'')}" required></div><div class="field"><label>القسم</label><input class="input" name="cat" value="${esc(edit?.cat||'')}" required></div><div class="field"><label>السعر</label><input class="input" type="number" name="price" value="${edit?.price||''}" required></div><div class="field"><label>السعر قبل الخصم</label><input class="input" type="number" name="old" value="${edit?.old||0}"></div><div class="field"><label>المخزون</label><input class="input" type="number" name="stock" value="${edit?.stock||0}"></div><div class="field"><label>رابط الصورة</label><input class="input" name="img" value="${esc(edit?.img||'')}" required></div><div class="field" style="grid-column:1/-1"><label>وصف المنتج</label><textarea class="input" name="desc" rows="4" placeholder="اكتب وصفًا مختصرًا وواضحًا للمنتج">${esc(edit?.desc||'')}</textarea></div><div class="field" style="grid-column:1/-1"><label>صور إضافية</label><textarea class="input" name="images" rows="3" placeholder="ضع رابط صورة في كل سطر أو افصل بينها بفواصل">${esc((edit?.images||[]).join("\n"))}</textarea><small class="muted">اختياري: حتى 7 روابط إضافية، والصورة الأساسية تبقى في حقل رابط الصورة.</small></div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px"><input class="input" id="productImagesPicker" type="file" accept="image/jpeg,image/png,image/webp" multiple><button class="btn" type="button" onclick="uploadProductImages()">رفع الصور إلى Cloudinary</button><span class="muted" id="imageUploadStatus">'+(cloudName&&uploadPreset?'جاهز للرفع':'أضف إعدادات Cloudinary في Render أولاً')+'</span></div></div><button class="btn hot">${edit?'حفظ التعديل':'إضافة المنتج'}</button></form><div class="scroll"><table class="table"><tr><th>المنتج</th><th>السعر</th><th>المخزون</th><th>إدارة</th></tr>${d.products.map(x=>`<tr><td>${esc(x.name)}</td><td>${money(x.price)} ${esc(s.currency)}</td><td>${x.stock}</td><td><a class="btn" href="/admin?edit=${x.id}#products">تعديل</a> <form style="display:inline" method="post" action="/admin/delete"><input type="hidden" name="csrf" value="${token}"><input type="hidden" name="id" value="${x.id}"><button class="btn danger">حذف</button></form></td></tr>`).join('')}</table></div></section>${ADMIN_ORDERS.renderOrders(d,s,orderFilter,orderQ,orderCity,esc,money,normPhone,token)}<section id="settings" class="adminbox" style="margin-top:16px"><h3>إعدادات المتجر</h3><form method="post" action="/admin/settings"><input type="hidden" name="csrf" value="${token}"><div class="two"><div class="field"><label>اسم المتجر</label><input class="input" name="name" value="${esc(s.name)}"></div><div class="field"><label>الاسم الإنجليزي</label><input class="input" name="en" value="${esc(s.en)}"></div><div class="field"><label>العملة</label><input class="input" name="currency" value="${esc(s.currency)}"></div><div class="field"><label>واتساب</label><input class="input" name="wa" value="${esc(s.wa)}"></div><div class="field"><label>الشحن</label><input class="input" type="number" name="ship" value="${s.ship}"></div><div class="field"><label>الشحن المجاني من</label><input class="input" type="number" name="free" value="${s.free}"></div></div><div class="field"><label>الوصف</label><input class="input" name="tag" value="${esc(s.tag)}"></div><button class="btn hot">حفظ الإعدادات</button></form></section></div></main><script>const novaCloudinary={cloud:${JSON.stringify(cloudName)},preset:${JSON.stringify(uploadPreset)}};async function uploadProductImages(){let picker=document.getElementById("productImagesPicker"),field=document.querySelector("textarea[name=images]"),status=document.getElementById("imageUploadStatus");if(!novaCloudinary.cloud||!novaCloudinary.preset){status.textContent="إعدادات Cloudinary غير مكتملة في Render";return}if(!picker.files.length){status.textContent="اختر صورة واحدة على الأقل";return}let urls=(field.value||"").split(/\\n+/).map(x=>x.trim()).filter(Boolean);for(let file of picker.files){if(file.size>10*1024*1024){status.textContent="الحد الأقصى للصورة 10MB";continue}status.textContent="جارٍ رفع "+file.name+"...";let body=new FormData();body.append("file",file);body.append("upload_preset",novaCloudinary.preset);try{let r=await fetch("https://api.cloudinary.com/v1_1/"+encodeURIComponent(novaCloudinary.cloud)+"/image/upload",{method:"POST",body}),j=await r.json();if(!r.ok||!j.secure_url)throw new Error(j.error?.message||"فشل الرفع");if(!urls.includes(j.secure_url))urls.push(j.secure_url);field.value=urls.slice(0,7).join("\\n");status.textContent="تم رفع الصورة: "+file.name}catch(e){status.textContent=e.message||"تعذر رفع الصورة"}}picker.value=""}let lastOrderId=${JSON.stringify(d.orders.filter(o=>!o.archivedAt).length?d.orders.filter(o=>!o.archivedAt).slice(-1)[0].id:"")};function enableOrderNotifications(){if(!('Notification' in window)){alert('المتصفح لا يدعم الإشعارات');return}Notification.requestPermission().then(p=>{if(p==='granted')new Notification('NOVA STORE',{body:'تم تفعيل تنبيهات الطلبات الجديدة'})})}async function pollOrders(){try{let r=await fetch('/admin/orders-ping',{cache:'no-store'});if(!r.ok)return;let j=await r.json();if(j.latestId&&lastOrderId&&j.latestId!==lastOrderId){if(Notification.permission==='granted')new Notification('طلب جديد في NOVA STORE',{body:(j.name||'عميل جديد')+' · '+j.total+' ${esc(s.currency)}'});try{let C=window.AudioContext||window.webkitAudioContext,a=new C(),o=a.createOscillator(),g=a.createGain();o.connect(g);g.connect(a.destination);o.frequency.value=880;g.gain.value=.06;o.start();o.stop(a.currentTime+.18)}catch(e){}location.reload()}lastOrderId=j.latestId||lastOrderId}catch(e){}}setInterval(pollOrders,15000);</script></body></html>`}
-function parseBody(req){return new Promise((ok,no)=>{let d='';req.on('data',c=>{d+=c;if(d.length>1e6)no(Error('large'))});req.on('end',()=>ok(d))})}async function jsonBody(req){try{let raw=await parseBody(req);return JSON.parse(raw||'{}')}catch{return null}}function form(x){return Object.fromEntries(new URLSearchParams(x))}function send(res,n,b,t='text/html; charset=utf-8',h={}){res.writeHead(n,{'content-type':t,'x-content-type-options':'nosniff','referrer-policy':'strict-origin-when-cross-origin','permissions-policy':'camera=(), microphone=(), geolocation=()',...h});res.end(res._head?'':b)}function red(res,x){send(res,302,'','text/plain',{location:x})}
-http.createServer(async(req,res)=>{try{if(req.method==='HEAD'){req.method='GET';res._head=true}let u=new URL(req.url,'http://x'),p=u.pathname;if(req.method==='GET'&&p==='/nova-avatar.svg'){const avatar=path.join(__dirname,'nova-avatar.svg');if(!fs.existsSync(avatar))return send(res,404,'','text/plain');return send(res,200,fs.readFileSync(avatar),'image/svg+xml; charset=utf-8',{'cache-control':'public, max-age=604800, immutable'})}if(req.method==='GET'&&p==='/robots.txt')return send(res,200,'User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /account\nSitemap: https://nova-store-icxo.onrender.com/sitemap.xml\n','text/plain; charset=utf-8');if(req.method==='GET'&&p==='/sitemap.xml')return send(res,200,'<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://nova-store-icxo.onrender.com/</loc></url><url><loc>https://nova-store-icxo.onrender.com/track</loc></url><url><loc>https://nova-store-icxo.onrender.com/account/login</loc></url><url><loc>https://nova-store-icxo.onrender.com/shipping</loc></url><url><loc>https://nova-store-icxo.onrender.com/returns</loc></url><url><loc>https://nova-store-icxo.onrender.com/privacy</loc></url></urlset>','application/xml; charset=utf-8');if(req.method==='GET'&&p==='/shipping')return send(res,200,infoPage('shipping'));if(req.method==='GET'&&p==='/returns')return send(res,200,infoPage('returns'));if(req.method==='GET'&&p==='/privacy')return send(res,200,infoPage('privacy'));if(req.method==='GET'&&p==='/')return send(res,200,home(req));if(req.method==='GET'&&p==='/product')return send(res,200,productPage(req));if(req.method==='GET'&&p==='/checkout')return send(res,200,checkout(req));if(req.method==='GET'&&p==='/track')return send(res,200,track(req));if(req.method==='GET'&&p==='/health')return send(res,200,'{"ok":true}','application/json');if(req.method==='GET'&&p==='/account/login')return send(res,200,page('تسجيل الدخول',CUSTOMER.authBody('login','',esc)));if(req.method==='GET'&&p==='/account/register')return send(res,200,page('إنشاء حساب',CUSTOMER.authBody('register','',esc)));if(req.method==='GET'&&p==='/account'){let d=S(),c=CUSTOMER.sessionCustomer(req,d,CUSTOMER_SESSION_SECRET);if(!c)return red(res,'/account/login');return send(res,200,page('حسابي',CUSTOMER.accountBody(c,d,d.settings,esc,money,'',CUSTOMER.csrfToken(c.id,CUSTOMER_SESSION_SECRET)) ))}if(req.method==='POST'&&p==='/order'){let x=await jsonBody(req),d=S(),customer=CUSTOMER.sessionCustomer(req,d,CUSTOMER_SESSION_SECRET);if(!x||typeof x!=='object'||Array.isArray(x))return send(res,400,JSON.stringify({error:'بيانات الطلب غير صالحة'}),'application/json');if(!x.name||!x.phone||!x.city||!x.area||!x.address||!Array.isArray(x.items)||!x.items.length)return send(res,400,JSON.stringify({error:'أكمل الاسم والهاتف والمدينة والمنطقة والعنوان والسلة'}),'application/json');if(!validCheckoutPhone(x.phone))return send(res,400,JSON.stringify({error:'رقم الهاتف يجب أن يكون 10 أرقام ويبدأ بـ 09'}),'application/json');if(!validLocation(x.city,x.area))return send(res,400,JSON.stringify({error:'اختر المدينة والمنطقة من القوائم المتاحة'}),'application/json');let items=[];for(let i of x.items){let q=Math.max(1,Math.min(+i.q||1,20)),z=d.products.find(a=>a.id===i.id);if(z&&z.stock>0)items.push({id:z.id,name:z.name,price:z.price,q:Math.min(q,z.stock)})}if(!items.length)return send(res,400,JSON.stringify({error:'لا توجد منتجات متاحة'}),'application/json');let sub=items.reduce((a,z)=>a+z.price*z.q,0),sh=sub>=d.settings.free?0:+d.settings.ship,id='ORD-'+Date.now().toString(36).toUpperCase();for(let i of items){let z=d.products.find(a=>a.id===i.id);if(z)z.stock=Math.max(0,z.stock-i.q)}let order={id,created:new Date().toISOString(),status:'جديد',readAt:null,archivedAt:null,customerId:customer?.id||null,name:x.name,phone:x.phone,city:x.city,area:x.area,address:x.address,notes:x.notes||'',items,total:sub+sh,inventoryRestored:false};d.orders.push(order);W(d);notifyTelegram(order,d.settings);return send(res,200,JSON.stringify({id}),'application/json')}
-if(req.method==='POST'&&p==='/account/register'){let d=S(),x=form(await parseBody(req)),r=CUSTOMER.register(d,x);if(r.error)return send(res,400,page('إنشاء حساب',CUSTOMER.authBody('register',r.error,esc)));W(d);return send(res,302,'','text/plain',{'set-cookie':CUSTOMER.sessionCookie(r.customer.id,CUSTOMER_SESSION_SECRET),location:'/account'})}if(req.method==='POST'&&p==='/account/login'){let d=S(),x=form(await parseBody(req)),r=CUSTOMER.login(d,x.phone,x.password);if(r.error)return send(res,401,page('تسجيل الدخول',CUSTOMER.authBody('login',r.error,esc)));return send(res,302,'','text/plain',{'set-cookie':CUSTOMER.sessionCookie(r.customer.id,CUSTOMER_SESSION_SECRET),location:'/account'})}if(req.method==='POST'&&p==='/account/logout'){let d=S(),c=CUSTOMER.sessionCustomer(req,d,CUSTOMER_SESSION_SECRET),x=form(await parseBody(req));if(!c)return red(res,'/account/login');if(!CUSTOMER.csrfValid(c.id,CUSTOMER_SESSION_SECRET,x.csrf))return send(res,403,'Forbidden');return send(res,302,'','text/plain',{'set-cookie':CUSTOMER.clearCookie(),location:'/'})}if(req.method==='POST'&&p==='/account/profile'){let d=S(),c=CUSTOMER.sessionCustomer(req,d,CUSTOMER_SESSION_SECRET);if(!c)return red(res,'/account/login');let x=form(await parseBody(req));if(!CUSTOMER.csrfValid(c.id,CUSTOMER_SESSION_SECRET,x.csrf))return send(res,403,'Forbidden');let r=CUSTOMER.updateProfile(d,c,x);if(r.error)return send(res,400,page('حسابي',CUSTOMER.accountBody(c,d,d.settings,esc,money,r.error,CUSTOMER.csrfToken(c.id,CUSTOMER_SESSION_SECRET))));W(d);return send(res,200,page('حسابي',CUSTOMER.accountBody(c,d,d.settings,esc,money,'تم حفظ بياناتك بنجاح',CUSTOMER.csrfToken(c.id,CUSTOMER_SESSION_SECRET))))}if(req.method==='POST'&&p==='/account/password'){let d=S(),c=CUSTOMER.sessionCustomer(req,d,CUSTOMER_SESSION_SECRET);if(!c)return red(res,'/account/login');let x=form(await parseBody(req));if(!CUSTOMER.csrfValid(c.id,CUSTOMER_SESSION_SECRET,x.csrf))return send(res,403,'Forbidden');let r=CUSTOMER.changePassword(c,x.currentPassword,x.newPassword);if(r.error)return send(res,400,page('حسابي',CUSTOMER.accountBody(c,d,d.settings,esc,money,r.error,CUSTOMER.csrfToken(c.id,CUSTOMER_SESSION_SECRET))));W(d);return send(res,200,page('حسابي',CUSTOMER.accountBody(c,d,d.settings,esc,money,'تم تغيير كلمة المرور',CUSTOMER.csrfToken(c.id,CUSTOMER_SESSION_SECRET))))}
-if(req.method==='GET'&&p==='/admin')return send(res,200,admin(req));if(req.method==='GET'&&p==='/admin/orders-ping'){if(!ses(req))return send(res,401,'{}','application/json');let d=S(),o=[...d.orders].reverse().find(x=>!x.archivedAt);return send(res,200,JSON.stringify({latestId:o?.id||'',name:o?.name||'',total:o?.total||0,unread:d.orders.filter(x=>x.readAt===null&&!x.archivedAt).length}),'application/json')}if(req.method==='GET'&&p==='/admin/orders.csv'){if(!ses(req))return red(res,'/admin');return send(res,200,exportOrdersCsv(req),'text/csv; charset=utf-8',{'content-disposition':'attachment; filename="nova-orders.csv"','cache-control':'no-store'})}if(req.method==='POST'&&p==='/admin/login'){if(!adminLoginAllowed(req))return send(res,429,admin(req,'محاولات دخول كثيرة. حاول بعد 15 دقيقة.'));let x=form(await parseBody(req));if(!ADMIN_EMAIL||!ADMIN_PASSWORD)return send(res,503,admin(req,'لوحة الإدارة غير مهيأة: يجب ضبط ADMIN_EMAIL و ADMIN_PASSWORD في متغيرات البيئة.'));if(x.email===ADMIN_EMAIL&&x.password===ADMIN_PASSWORD){let id=crypto.randomBytes(24).toString('hex');sessions.set(id,{at:Date.now(),csrf:crypto.randomBytes(32).toString('hex')});adminLoginAttempts.delete(req.socket.remoteAddress||'unknown');return send(res,302,'','text/plain',{'set-cookie':`sid=${id}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=28800`,'cache-control':'no-store',location:'/admin'})}return send(res,401,admin(req,'بيانات الدخول غير صحيحة'))}if(p.startsWith('/admin/')&&!ses(req))return red(res,'/admin');if(req.method==='POST'&&p==='/admin/logout'){let x=form(await parseBody(req));if(!csrfOk(req,x.csrf))return send(res,403,'Forbidden');let c=cookie(req);sessions.delete(c.sid);return send(res,302,'','text/plain',{'set-cookie':'sid=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0','cache-control':'no-store',location:'/admin'})}if(req.method==='POST'&&p==='/admin/product'){let x=form(await parseBody(req));if(!csrfOk(req,x.csrf))return send(res,403,'Forbidden');let d=S(),z=d.products.find(a=>a.id===x.id),o={id:x.id||'p'+Date.now().toString(36),name:x.name,cat:x.cat,price:+x.price||0,old:+x.old||0,stock:Math.max(0,+x.stock||0),img:x.img,images:String(x.images||'').split(/[\n,]+/).map(v=>v.trim()).filter(Boolean).slice(0,7),desc:x.desc||''};z?Object.assign(z,o):d.products.push(o);W(d);return red(res,'/admin#products')}if(req.method==='POST'&&p==='/admin/delete'){let x=form(await parseBody(req));if(!csrfOk(req,x.csrf))return send(res,403,'Forbidden');let d=S();d.products=d.products.filter(a=>a.id!==x.id);W(d);return red(res,'/admin#products')}if(req.method==='POST'&&p==='/admin/read'){let x=form(await parseBody(req));if(!csrfOk(req,x.csrf))return send(res,403,'Forbidden');let d=S(),o=d.orders.find(a=>a.id===x.id);if(o)o.readAt=new Date().toISOString();W(d);return red(res,'/admin#orders')}if(req.method==='POST'&&p==='/admin/order-archive'){let x=form(await parseBody(req));if(!csrfOk(req,x.csrf))return send(res,403,'Forbidden');let d=S(),o=d.orders.find(a=>a.id===x.id);if(o){if(o.status!=='ملغي'&&!o.inventoryRestored){for(let i of o.items){let z=d.products.find(a=>a.id===i.id);if(z)z.stock=(+z.stock||0)+(+i.q||0)}o.inventoryRestored=true}o.archivedAt=new Date().toISOString()}W(d);return red(res,'/admin#orders')}if(req.method==='POST'&&p==='/admin/status'){let x=form(await parseBody(req));if(!csrfOk(req,x.csrf))return send(res,403,'Forbidden');let d=S(),o=d.orders.find(a=>a.id===x.id);if(o){let prev=o.status,next=x.status;if(next==='ملغي'&&prev!=='ملغي'&&!o.inventoryRestored){for(let i of o.items){let z=d.products.find(a=>a.id===i.id);if(z)z.stock=(+z.stock||0)+(+i.q||0)}o.inventoryRestored=true}if(prev==='ملغي'&&next!=='ملغي'&&o.inventoryRestored){let enough=o.items.every(i=>{let z=d.products.find(a=>a.id===i.id);return z&&(+z.stock||0)>=(+i.q||0)});if(enough){for(let i of o.items){let z=d.products.find(a=>a.id===i.id);z.stock-=+i.q||0}o.inventoryRestored=false}else next='ملغي'}o.status=next}W(d);return red(res,'/admin#orders')}if(req.method==='POST'&&p==='/admin/settings'){let x=form(await parseBody(req));if(!csrfOk(req,x.csrf))return send(res,403,'Forbidden');let d=S();d.settings={...d.settings,name:x.name,en:x.en,tag:x.tag,currency:x.currency,wa:x.wa,ship:+x.ship||0,free:+x.free||0};W(d);return red(res,'/admin#settings')}return send(res,404,'<h1>404</h1>')}catch(e){console.error(e);send(res,500,'<h1>Server Error</h1>')}}).listen(PORT,()=>console.log('NOVA on '+PORT));
+function productPage(req) {
+  const d = S(),
+    p = d.products.find(
+      (p) =>
+        p.id === new URL(req.url, "http://localhost").searchParams.get("id") &&
+        !p.archivedAt,
+    );
+  if (!p)
+    return page(
+      "المنتج غير موجود",
+      '<main id="main-content" class="section wrap"><div class="emptyState"><h1>هذا المنتج غير موجود</h1><a class="btn hot" href="/#shop">اكتشف المجموعة</a></div></main>',
+    );
+  return page(p.name, VIEWS.product(d, p, esc, money), "", {
+    path: STOREFRONT.productLink(p),
+    description: p.desc || p.name,
+    image: p.img,
+    product: p,
+  });
+}
+function checkout(req) {
+  const d = S(),
+    c = CUSTOMER.sessionCustomer(req, d, CUSTOMER_SESSION_SECRET) || {};
+  return page(
+    "السلة وإتمام الطلب",
+    VIEWS.checkout(d.settings, c, esc),
+    "const novaAreas=" + VIEWS.json(LIBYA_AREAS) + ";" + VIEWS.checkoutScript,
+    { path: "/checkout", noindex: true },
+  );
+}
+function safeImage(value) {
+  try {
+    const u = new URL(value);
+    return u.protocol === "https:" && !u.username && !u.password;
+  } catch {
+    return false;
+  }
+}
+function cookie(req) {
+  return Object.fromEntries(
+    (req.headers.cookie || "")
+      .split(";")
+      .filter(Boolean)
+      .map((x) => {
+        let i = x.indexOf("=");
+        return i < 0
+          ? [x.trim(), ""]
+          : [x.slice(0, i).trim(), decodeURIComponent(x.slice(i + 1))];
+      }),
+  );
+}
+function ses(req) {
+  let c = cookie(req),
+    s = sessions.get(c.sid);
+  if (!s) return null;
+  if (Date.now() - s.at > 28800000) {
+    sessions.delete(c.sid);
+    return null;
+  }
+  return s;
+}
+function csrfOk(req, token) {
+  let s = ses(req),
+    a = Buffer.from(String(s?.csrf || "")),
+    b = Buffer.from(String(token || ""));
+  return a.length > 0 && a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+function normPhone(v) {
+  let p = String(v || "").replace(/\D/g, "");
+  if (p.startsWith("00")) p = p.slice(2);
+  if (p.startsWith("0")) p = "218" + p.slice(1);
+  return p;
+}
+function validCheckoutPhone(v) {
+  return /^09[0-9]{8}$/.test(String(v || "").trim());
+}
+function validLocation(city, area) {
+  return Array.isArray(LIBYA_AREAS[city]) && LIBYA_AREAS[city].includes(area);
+}
+
+async function notifyTelegram(order, settings) {
+  const token = process.env.TELEGRAM_BOT_TOKEN,
+    chatId = process.env.TELEGRAM_CHAT_ID;
+  if (!token || !chatId) return;
+  const lines = [
+    "🛍️ طلب جديد في NOVA STORE",
+    "",
+    "رقم الطلب: " + order.id,
+    "العميل: " + order.name,
+    "الهاتف: " + order.phone,
+    "المدينة: " + order.city,
+    "المنطقة: " + (order.area || "-"),
+    "العنوان: " + order.address,
+    "",
+    ...(order.items || []).map((i) => "• " + i.name + " × " + i.q),
+    "",
+    "الإجمالي: " + order.total + " " + (settings.currency || "د.ل"),
+  ];
+  try {
+    const host = "api." + "telegram.org";
+    const url = "https://" + host + "/bot" + token + "/sendMessage";
+    await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text: lines.join("\n") }),
+    });
+  } catch (e) {
+    console.error("Telegram notify failed:", e.message);
+  }
+}
+
+function statusMessage(o, s) {
+  if (o.status === "ملغي")
+    return "تم إلغاء طلبك. إذا كان هذا غير متوقع تواصل معنا عبر واتساب.";
+  if (o.status === "جديد") return "استلمنا طلبك وسنراجعه ونتواصل معك للتأكيد.";
+  if (o.status === "مؤكد") return "تم تأكيد طلبك.";
+  if (o.status === "قيد التجهيز") return "طلبك الآن قيد التجهيز.";
+  if (o.status === "قيد التوصيل") return "طلبك خرج للتوصيل وهو في الطريق إليك.";
+  if (o.status === "مكتمل")
+    return "تم تسليم الطلب بنجاح. شكرًا لاختيارك " + s.name + ".";
+  return "حالة الطلب: " + o.status;
+}
+function track(req) {
+  let d = S(),
+    s = d.settings,
+    u = new URL(req.url, "http://x"),
+    id = (u.searchParams.get("order") || "").trim(),
+    phone = (u.searchParams.get("phone") || "").trim(),
+    o = null;
+  if (id && phone) {
+    o = d.orders.find(
+      (x) =>
+        String(x.id).toLowerCase() === id.toLowerCase() &&
+        normPhone(x.phone) === normPhone(phone),
+    );
+  }
+  let steps = ["جديد", "مؤكد", "قيد التجهيز", "قيد التوصيل", "مكتمل"],
+    idx = o ? steps.indexOf(o.status) : -1;
+  let result = "";
+  if (id && phone && !o)
+    result =
+      '<div class="adminbox" style="margin-top:16px;border-color:#71333a"><b style="color:#ff8b95">لم نجد طلبًا بهذه البيانات.</b><p class="muted">تأكد من رقم الطلب ورقم الهاتف المستخدم عند الشراء.</p></div>';
+  if (o) {
+    let timeline =
+      o.status === "ملغي"
+        ? '<div class="adminbox" style="margin-top:16px;border-color:#71333a"><b style="color:#ff8b95">الطلب ملغي</b></div>'
+        : '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-top:16px">' +
+          steps
+            .map(
+              (z, i) =>
+                '<div style="padding:12px 8px;border-radius:14px;text-align:center;border:1px solid ' +
+                (i <= idx ? "#c5d5bf" : "#e5e0d8") +
+                ";background:" +
+                (i <= idx ? "#ecf1e6" : "#fff") +
+                ";color:" +
+                (i <= idx ? "#35502b" : "#777") +
+                ';font-weight:900;font-size:12px">' +
+                z +
+                "</div>",
+            )
+            .join("") +
+          "</div>";
+    result =
+      '<div class="adminbox" style="margin-top:16px"><div class="row"><span>رقم الطلب</span><b>' +
+      esc(o.id) +
+      '</b></div><div class="row"><span>الحالة</span><b class="ok">' +
+      esc(o.status) +
+      "</b></div>" +
+      timeline +
+      '<p style="font-weight:800;margin-top:18px">' +
+      esc(statusMessage(o, s)) +
+      '</p><div class="row"><span>الإجمالي</span><b>' +
+      money(o.total) +
+      " " +
+      esc(s.currency) +
+      '</b></div><div class="row"><span>المدينة</span><b>' +
+      esc(o.city) +
+      '</b></div><a class="btn hot" target="_blank" rel="noopener" href="https://wa.me/' +
+      encodeURIComponent(String(s.wa || "").replace(/\D/g, "")) +
+      "?text=" +
+      encodeURIComponent("مرحبًا، أريد الاستفسار عن طلبي رقم " + o.id) +
+      '">تواصل معنا عبر واتساب</a></div>';
+  }
+  return page(
+    "تتبع الطلب",
+    '<main class="section" id="main-content"><div class="wrap" style="max-width:760px"><div class="head"><div><h2>تتبع طلبك</h2><div class="muted">اكتب رقم الطلب ورقم الهاتف الذي استخدمته عند الشراء</div></div></div><form class="checkout" method="get" action="/track"><div class="two"><div class="field"><label>رقم الطلب</label><input class="input" name="order" value="' +
+      esc(id) +
+      '" placeholder="ORD-..." required></div><div class="field"><label>رقم الهاتف</label><input class="input" name="phone" value="' +
+      esc(phone) +
+      '" placeholder="09..." required></div></div><button class="btn hot">عرض حالة الطلب</button></form>' +
+      result +
+      "</div></main>",
+    "",
+    { path: "/track", noindex: true },
+  );
+}
+function csvCell(value) {
+  let text = String(value ?? "");
+  if (/^[=+\-@]/.test(text)) text = "'" + text;
+  return '"' + text.replace(/"/g, '""') + '"';
+}
+function exportOrdersCsv(req) {
+  let d = S(),
+    u = new URL(req.url, "http://x"),
+    filter = u.searchParams.get("of") || "all",
+    q = (u.searchParams.get("oq") || "").trim().toLowerCase(),
+    city = (u.searchParams.get("city") || "").trim(),
+    orders = d.orders
+      .filter((o) => !o.archivedAt)
+      .slice()
+      .reverse()
+      .filter(
+        (o) =>
+          (filter === "all" ||
+            (filter === "new" && o.readAt === null) ||
+            (filter === "active" && !["مكتمل", "ملغي"].includes(o.status)) ||
+            (filter === "done" && o.status === "مكتمل") ||
+            (filter === "cancel" && o.status === "ملغي")) &&
+          (!q ||
+            [o.id, o.name, o.phone, o.city, o.area]
+              .join(" ")
+              .toLowerCase()
+              .includes(q)) &&
+          (!city || o.city === city),
+      );
+  let rows = [
+    [
+      "رقم الطلب",
+      "التاريخ",
+      "الاسم",
+      "الهاتف",
+      "المدينة",
+      "المنطقة",
+      "الحالة",
+      "الإجمالي",
+      "ملاحظات",
+    ],
+  ].concat(
+    orders.map((o) => [
+      o.id,
+      new Date(o.created).toLocaleString("ar-LY"),
+      o.name,
+      o.phone,
+      o.city,
+      o.area || "",
+      o.status,
+      o.total,
+      o.notes || "",
+    ]),
+  );
+  return (
+    "\uFEFF" +
+    rows.map((row) => row.map(csvCell).join(",")).join("\r\n") +
+    "\r\n"
+  );
+}
+function infoPage(kind) {
+  let data = {
+    shipping: {
+      title: "الشحن والتوصيل",
+      heading: "الشحن والتوصيل",
+      intro: "نوصل طلبك داخل ليبيا بعد تأكيد البيانات معك.",
+      sections: [
+        [
+          "تكلفة الشحن",
+          "تُحسب تكلفة الشحن حسب إعدادات المتجر وتظهر لك بوضوح قبل تأكيد الطلب.",
+        ],
+        [
+          "مدة التوصيل",
+          "نتواصل معك بعد استلام الطلب لتأكيد العنوان والوقت المناسب للتوصيل.",
+        ],
+        [
+          "استلام الطلب",
+          "فضلاً تأكد من صحة رقم الهاتف والعنوان، وكن متاحًا للرد على المندوب عند وصول الطلب.",
+        ],
+      ],
+    },
+    returns: {
+      title: "الاستبدال والاسترجاع",
+      heading: "الاستبدال والاسترجاع",
+      intro: "هدفنا أن تكون تجربتك واضحة وعادلة.",
+      sections: [
+        [
+          "قبل الاستلام",
+          "إذا لاحظت مشكلة واضحة في المنتج عند الاستلام، تواصل معنا فورًا عبر واتساب مع رقم الطلب.",
+        ],
+        [
+          "الاستبدال",
+          "نراجع كل حالة حسب نوع المنتج وحالته، ويجب أن يكون المنتج غير مستخدم ومحافظًا على تغليفه قدر الإمكان.",
+        ],
+        [
+          "الاسترجاع",
+          "تواصل معنا خلال أقرب وقت من الاستلام لبحث طلب الاسترجاع وتحديد الخطوات المناسبة.",
+        ],
+      ],
+    },
+    privacy: {
+      title: "الخصوصية",
+      heading: "سياسة الخصوصية",
+      intro: "نستخدم بياناتك فقط لتجهيز الطلب وتحسين خدمة المتجر.",
+      sections: [
+        [
+          "البيانات التي نطلبها",
+          "الاسم ورقم الهاتف والمدينة والمنطقة والعنوان والملاحظات اللازمة للتوصيل.",
+        ],
+        [
+          "طريقة الاستخدام",
+          "تُستخدم البيانات للتواصل معك وتجهيز الطلب وتوصيله ومتابعته. وقد تُمرَّر بيانات الطلب إلى مقدمي خدمات الاستضافة والتوصيل وإشعارات الإدارة عند تفعيلها، بالقدر اللازم لتشغيل الخدمة.",
+        ],
+        [
+          "الحماية",
+          "تُحفظ كلمات المرور بصيغة مشتقة ومملّحة. نحفظ السلة والمفضلة على جهازك، ونستخدم ملفات ارتباط لإبقاء جلسة حسابك. يمكنك التواصل معنا لطلب تصحيح بياناتك أو حذف حسابك.",
+        ],
+      ],
+    },
+  }[kind];
+  if (!data)
+    return page(
+      "الصفحة غير موجودة",
+      '<main class="section" id="main-content"><div class="wrap"><div class="adminbox"><h2>الصفحة غير موجودة</h2></div></div></main>',
+    );
+  return page(
+    data.title,
+    `<main class="section" id="main-content"><div class="wrap" style="max-width:820px"><div class="head"><div><h1>${data.heading}</h1><p class="muted">${data.intro}</p></div></div><div class="adminbox">${data.sections.map(([h, b]) => `<section style="padding:8px 0 18px"><h3>${h}</h3><p class="muted" style="line-height:2">${b}</p></section>`).join("")}<p class="muted" style="border-top:1px solid #252a32;padding-top:16px">للاستفسار عن طلب محدد، تواصل معنا عبر واتساب من رابط المساعدة في أسفل الصفحة.</p></div></div></main>`,
+    "",
+    { path: "/" + kind },
+  );
+}
+const adminTheme = `.feat,.orderCard,.orderGrid div{background:#fff;color:var(--text);border-color:var(--line)}.orderCard.unread{border-color:#b7c6a9;box-shadow:none}.table td,.table th{border-color:var(--line)}.pill{border-color:var(--line)}.pill.new{background:#e7eedb;color:var(--green);border-color:#cedcbe}.adminnav{position:sticky;top:0;background:var(--bg);padding:15px 0;z-index:10}.features .feat{box-shadow:none;animation:none}.adminbox h3{font-size:19px}.table .btn{padding:7px 12px}.feat b{color:var(--green)}.adminbox+.adminbox{margin-top:20px}`;
+const adminLoginAttempts = new Map();
+function adminLoginAllowed(req) {
+  let ip = req.socket.remoteAddress || "unknown",
+    now = Date.now(),
+    x = adminLoginAttempts.get(ip);
+  if (!x || now - x.start > 900000) {
+    adminLoginAttempts.set(ip, { start: now, count: 1 });
+    return true;
+  }
+  if (x.count >= 10) return false;
+  x.count++;
+  return true;
+}
+function admin(req, msg = "") {
+  let session = ses(req);
+  if (!session)
+    return `<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${STOREFRONT.css}${css}${adminTheme}</style><title>دخول الإدارة — NOVA STORE</title><meta name="robots" content="noindex,nofollow"></head><body class="login"><form class="adminbox" method="post" action="/admin/login"><div class="brand"><img class="logo logoImg" src="/nova-avatar.svg" alt="" width="42" height="42"><span>لوحة إدارة NOVA</span></div><h2>دخول المالك</h2>${msg ? `<p style="color:#ff8b95">${esc(msg)}</p>` : ""}<div class="field"><label>البريد</label><input class="input" name="email" required></div><div class="field"><label>كلمة المرور</label><input class="input" type="password" name="password" required></div><button class="btn hot">دخول</button></form></body></html>`;
+  let token = session?.csrf || "",
+    d = S(),
+    s = d.settings,
+    u = new URL(req.url, "http://x"),
+    edit = d.products.find((x) => x.id === u.searchParams.get("edit")),
+    cloudName = process.env.CLOUDINARY_CLOUD_NAME || "",
+    uploadPreset = process.env.CLOUDINARY_UPLOAD_PRESET || "",
+    revenue = d.orders
+      .filter((o) => o.status === "مكتمل")
+      .reduce((a, o) => a + (+o.total || 0), 0),
+    active = d.orders.filter(
+      (o) => !["مكتمل", "ملغي"].includes(o.status),
+    ).length,
+    low = d.products.filter((x) => x.stock <= 3).length,
+    unread = d.orders.filter((o) => o.readAt === null && !o.archivedAt).length,
+    orderFilter = u.searchParams.get("of") || "all",
+    orderQ = (u.searchParams.get("oq") || "").trim(),
+    orderCity = (u.searchParams.get("city") || "").trim();
+  return `<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}${proCss}${ADMIN_ORDERS.css}${STOREFRONT.css}${adminTheme}</style><title>لوحة الإدارة — NOVA STORE</title><meta name="robots" content="noindex,nofollow"></head><body><main class="section" id="main-content"><div class="wrap"><div class="head"><div><h2>لوحة إدارة NOVA</h2><div class="muted">${d.products.length} منتجات · ${d.orders.length} طلبات</div></div><a class="btn" href="/">عرض المتجر</a></div><div class="adminnav"><a class="btn" href="#products">المنتجات</a><a class="btn" href="#orders">الطلبات ${unread ? `<span class="badgeCount">${unread}</span>` : ""}</a><a class="btn" href="#settings">الإعدادات</a><form method="post" action="/admin/logout"><input type="hidden" name="csrf" value="${token}"><button class="btn danger">خروج</button></form></div><div class="features" style="margin-bottom:16px"><div class="feat">💰<b>${money(revenue)} ${esc(s.currency)}</b><span class="muted">مبيعات مكتملة</span></div><div class="feat">🧾<b>${active}</b><span class="muted">طلبات نشطة</span></div><div class="feat">📦<b>${d.products.length}</b><span class="muted">منتجات</span></div><div class="feat">⚠️<b>${low}</b><span class="muted">مخزون منخفض</span></div></div>${msg ? `<p class="ok">${esc(msg)}</p>` : ""}<section id="products" class="adminbox"><h3>${edit ? "تعديل المنتج" : "إضافة منتج"}</h3><form method="post" action="/admin/product"><input type="hidden" name="csrf" value="${token}"><input type="hidden" name="id" value="${esc(edit?.id || "")}"><div class="two"><div class="field"><label>الاسم</label><input class="input" name="name" value="${esc(edit?.name || "")}" required></div><div class="field"><label>القسم</label><input class="input" name="cat" value="${esc(edit?.cat || "")}" required></div><div class="field"><label>السعر</label><input class="input" type="number" name="price" min="0" step="0.01" value="${edit?.price || ""}" required></div><div class="field"><label>السعر قبل الخصم</label><input class="input" type="number" name="old" min="0" step="0.01" value="${edit?.old || 0}"></div><div class="field"><label>المخزون</label><input class="input" type="number" name="stock" min="0" step="1" value="${edit?.stock || 0}"></div><div class="field"><label>رابط الصورة</label><input class="input" name="img" value="${esc(edit?.img || "")}" required></div><div class="field" style="grid-column:1/-1"><label>وصف المنتج</label><textarea class="input" name="desc" rows="4" placeholder="اكتب وصفًا مختصرًا وواضحًا للمنتج">${esc(edit?.desc || "")}</textarea></div><div class="field" style="grid-column:1/-1"><label>صور إضافية</label><textarea class="input" name="images" rows="3" placeholder="ضع رابط صورة في كل سطر أو افصل بينها بفواصل">${esc((edit?.images || []).join("\n"))}</textarea><small class="muted">اختياري: حتى 7 روابط إضافية، والصورة الأساسية تبقى في حقل رابط الصورة.</small></div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px"><input class="input" id="productImagesPicker" type="file" accept="image/jpeg,image/png,image/webp" multiple><button class="btn" type="button" onclick="uploadProductImages()">رفع الصور إلى Cloudinary</button><span class="muted" id="imageUploadStatus">${cloudName && uploadPreset ? "جاهز للرفع" : "أضف إعدادات Cloudinary في Render أولاً"}</span></div></div><button class="btn hot">${edit ? "حفظ التعديل" : "إضافة المنتج"}</button></form><div class="scroll"><table class="table"><tr><th>المنتج</th><th>السعر</th><th>المخزون</th><th>إدارة</th></tr>${d.products.map((x) => `<tr><td>${esc(x.name)}${x.archivedAt ? ' <small class="muted">(مخفي)</small>' : ""}</td><td>${money(x.price)} ${esc(s.currency)}</td><td>${x.stock}</td><td><a class="btn" href="/admin?edit=${esc(x.id)}#products">تعديل</a> <form style="display:inline" method="post" action="${x.archivedAt ? "/admin/product-restore" : "/admin/delete"}"><input type="hidden" name="csrf" value="${token}"><input type="hidden" name="id" value="${esc(x.id)}"><button class="btn ${x.archivedAt ? "" : "danger"}">${x.archivedAt ? "إعادة إظهار" : "إخفاء"}</button></form></td></tr>`).join("")}</table></div></section>${ADMIN_ORDERS.renderOrders(d, s, orderFilter, orderQ, orderCity, esc, money, normPhone, token)}<section id="settings" class="adminbox" style="margin-top:16px"><h3>إعدادات المتجر</h3><form method="post" action="/admin/settings"><input type="hidden" name="csrf" value="${token}"><div class="two"><div class="field"><label>اسم المتجر</label><input class="input" name="name" value="${esc(s.name)}"></div><div class="field"><label>الاسم الإنجليزي</label><input class="input" name="en" value="${esc(s.en)}"></div><div class="field"><label>العملة</label><input class="input" name="currency" value="${esc(s.currency)}"></div><div class="field"><label>واتساب</label><input class="input" name="wa" value="${esc(s.wa)}"></div><div class="field"><label>الشحن</label><input class="input" type="number" name="ship" value="${s.ship}"></div><div class="field"><label>الشحن المجاني من</label><input class="input" type="number" name="free" value="${s.free}"></div></div><div class="field"><label>الوصف</label><input class="input" name="tag" value="${esc(s.tag)}"></div><button class="btn hot">حفظ الإعدادات</button></form></section></div></main><script>const novaCloudinary={cloud:${VIEWS.json(cloudName)},preset:${VIEWS.json(uploadPreset)}};async function uploadProductImages(){let picker=document.getElementById("productImagesPicker"),field=document.querySelector("textarea[name=images]"),status=document.getElementById("imageUploadStatus");if(!novaCloudinary.cloud||!novaCloudinary.preset){status.textContent="إعدادات Cloudinary غير مكتملة في Render";return}if(!picker.files.length){status.textContent="اختر صورة واحدة على الأقل";return}let urls=(field.value||"").split(/\\n+/).map(x=>x.trim()).filter(Boolean);for(let file of picker.files){if(file.size>10*1024*1024){status.textContent="الحد الأقصى للصورة 10MB";continue}status.textContent="جارٍ رفع "+file.name+"...";let body=new FormData();body.append("file",file);body.append("upload_preset",novaCloudinary.preset);try{let r=await fetch("https://api.cloudinary.com/v1_1/"+encodeURIComponent(novaCloudinary.cloud)+"/image/upload",{method:"POST",body}),j=await r.json();if(!r.ok||!j.secure_url)throw new Error(j.error?.message||"فشل الرفع");if(!urls.includes(j.secure_url))urls.push(j.secure_url);field.value=urls.slice(0,7).join("\\n");status.textContent="تم رفع الصورة: "+file.name}catch(e){status.textContent=e.message||"تعذر رفع الصورة"}}picker.value=""}let lastOrderId=${JSON.stringify(d.orders.filter((o) => !o.archivedAt).length ? d.orders.filter((o) => !o.archivedAt).slice(-1)[0].id : "")};function enableOrderNotifications(){if(!('Notification' in window)){alert('المتصفح لا يدعم الإشعارات');return}Notification.requestPermission().then(p=>{if(p==='granted')new Notification('NOVA STORE',{body:'تم تفعيل تنبيهات الطلبات الجديدة'})})}async function pollOrders(){try{let r=await fetch('/admin/orders-ping',{cache:'no-store'});if(!r.ok)return;let j=await r.json();if(j.latestId&&lastOrderId&&j.latestId!==lastOrderId){if('Notification' in window&&Notification.permission==='granted')new Notification('طلب جديد في NOVA STORE',{body:(j.name||'عميل جديد')+' · '+j.total+' '+${VIEWS.json(s.currency)}});try{let C=window.AudioContext||window.webkitAudioContext,a=new C(),o=a.createOscillator(),g=a.createGain();o.connect(g);g.connect(a.destination);o.frequency.value=880;g.gain.value=.06;o.start();o.stop(a.currentTime+.18)}catch(e){}location.reload()}lastOrderId=j.latestId||lastOrderId}catch(e){}}setInterval(pollOrders,15000);</script></body></html>`;
+}
+async function readBody(req) {
+  let size = 0;
+  const chunks = [];
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size > 100000) {
+      const e = Error("Body too large");
+      e.status = 413;
+      throw e;
+    }
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+async function parseBody(req) {
+  return req.rawBody || "";
+}
+async function jsonBody(req) {
+  try {
+    let raw = await parseBody(req);
+    return JSON.parse(raw || "{}");
+  } catch {
+    return null;
+  }
+}
+function form(x) {
+  return Object.fromEntries(new URLSearchParams(x));
+}
+function send(res, n, b, t = "text/html; charset=utf-8", h = {}) {
+  res.writeHead(n, {
+    "content-type": t,
+    "x-content-type-options": "nosniff",
+    "referrer-policy": "no-referrer",
+    "x-frame-options":
+      process.env.NOVA_PREVIEW === "true" ? "SAMEORIGIN" : "DENY",
+    "cache-control": "no-store",
+    "permissions-policy": "camera=(), microphone=(), geolocation=()",
+    ...h,
+  });
+  res.end(res._head ? "" : b);
+}
+function red(res, x) {
+  send(res, 302, "", "text/plain", { location: x });
+}
+async function handle(req, res) {
+  if (
+    process.env.NOVA_PREVIEW === "true" &&
+    ["POST", "PATCH"].includes(req.method) &&
+    req.url !== "/api/quote"
+  )
+    return send(
+      res,
+      403,
+      JSON.stringify({
+        error:
+          "هذه نسخة معاينة. الطلبات والحسابات متاحة على المتجر الأساسي فقط.",
+      }),
+      "application/json",
+    );
+  if (await mobile.handle(req, res)) return;
+  if (req.method === "HEAD") {
+    req.method = "GET";
+    res._head = true;
+  }
+  let u = new URL(req.url, "http://x"),
+    p = u.pathname;
+  if (
+    req.method === "GET" &&
+    ["/nova-avatar.svg", "/nova-avatar.png"].includes(p)
+  )
+    return send(
+      res,
+      200,
+      fs.readFileSync(path.join(__dirname, "nova-avatar.svg"), "utf8"),
+      "image/svg+xml",
+    );
+  if (
+    req.method === "GET" &&
+    p === "/preview-mobile" &&
+    process.env.NOVA_PREVIEW === "true"
+  )
+    return send(
+      res,
+      200,
+      '<!doctype html><html><head><meta name="robots" content="noindex"><title>NOVA mobile layout preview</title></head><body style="margin:0;background:#e5e0d8;display:flex;justify-content:center"><iframe title="NOVA mobile viewport" src="/" style="width:390px;height:850px;border:0;background:white"></iframe></body></html>',
+      "text/html; charset=utf-8",
+      { "x-frame-options": "SAMEORIGIN" },
+    );
+  if (req.method === "GET" && p === "/favicon.svg")
+    return send(
+      res,
+      200,
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="16" fill="#243d31"/><text x="14" y="49" fill="#fff" font-family="Georgia,serif" font-style="italic" font-size="49">N</text></svg>',
+      "image/svg+xml",
+    );
+  if (req.method === "GET" && p === "/robots.txt")
+    return send(
+      res,
+      200,
+      "User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /account\nSitemap: https://nova-store-icxo.onrender.com/sitemap.xml\n",
+      "text/plain; charset=utf-8",
+    );
+  if (req.method === "GET" && p === "/sitemap.xml")
+    return send(
+      res,
+      200,
+      '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' +
+        [
+          "/",
+          "/shipping",
+          "/returns",
+          "/privacy",
+          ...S()
+            .products.filter((p) => !p.archivedAt)
+            .map(STOREFRONT.productLink),
+        ]
+          .map(
+            (p) =>
+              "<url><loc>" +
+              esc("https://nova-store-icxo.onrender.com" + p) +
+              "</loc></url>",
+          )
+          .join("") +
+        "</urlset>",
+      "application/xml; charset=utf-8",
+    );
+  if (req.method === "GET" && p === "/shipping")
+    return send(res, 200, infoPage("shipping"));
+  if (req.method === "GET" && p === "/returns")
+    return send(res, 200, infoPage("returns"));
+  if (req.method === "GET" && p === "/privacy")
+    return send(res, 200, infoPage("privacy"));
+  if (req.method === "GET" && p === "/") return send(res, 200, home(req));
+  if (req.method === "GET" && p === "/product")
+    return send(
+      res,
+      S().products.some(
+        (z) => z.id === u.searchParams.get("id") && !z.archivedAt,
+      )
+        ? 200
+        : 404,
+      productPage(req),
+    );
+  if (req.method === "GET" && p === "/checkout")
+    return send(res, 200, checkout(req));
+  if (req.method === "GET" && p === "/track") return send(res, 200, track(req));
+  if (req.method === "GET" && p === "/health")
+    return send(res, 200, '{"ok":true}', "application/json");
+  if (req.method === "GET" && p === "/account/login")
+    return send(
+      res,
+      200,
+      page("تسجيل الدخول", CUSTOMER.authBody("login", "", esc), "", {
+        path: "/account/login",
+        noindex: true,
+      }),
+    );
+  if (req.method === "GET" && p === "/account/register")
+    return send(
+      res,
+      200,
+      page("إنشاء حساب", CUSTOMER.authBody("register", "", esc), "", {
+        path: "/account/register",
+        noindex: true,
+      }),
+    );
+  if (req.method === "GET" && p === "/account") {
+    let d = S(),
+      c = CUSTOMER.sessionCustomer(req, d, CUSTOMER_SESSION_SECRET);
+    if (!c) return red(res, "/account/login");
+    return send(
+      res,
+      200,
+      page(
+        "حسابي",
+        CUSTOMER.accountBody(
+          c,
+          d,
+          d.settings,
+          esc,
+          money,
+          "",
+          CUSTOMER.csrfToken(c.id, CUSTOMER_SESSION_SECRET),
+        ),
+      ),
+    );
+  }
+  if (req.method === "GET" && p === "/api/catalog")
+    return send(
+      res,
+      200,
+      JSON.stringify({
+        products: S()
+          .products.filter((p) => !p.archivedAt)
+          .map(({ id, name, price, stock, img }) => ({
+            id,
+            name,
+            price,
+            stock,
+            img,
+          })),
+        settings: {
+          currency: S().settings.currency,
+          ship: S().settings.ship,
+          free: S().settings.free,
+        },
+      }),
+      "application/json",
+    );
+  if (
+    ["POST", "PATCH"].includes(req.method) &&
+    (p === "/order" || p === "/api/quote")
+  ) {
+    try {
+      const input = await jsonBody(req),
+        d = S();
+      if (p === "/api/quote")
+        return send(
+          res,
+          200,
+          JSON.stringify(COMMERCE.quote(d, input?.items)),
+          "application/json",
+        );
+      const { order, replayed } = COMMERCE.createOrder(
+        d,
+        input,
+        CUSTOMER.sessionCustomer(req, d, CUSTOMER_SESSION_SECRET),
+      );
+      if (!replayed) {
+        W(d);
+        storage.afterCommit(() => notifyTelegram(order, d.settings));
+      }
+      return send(
+        res,
+        200,
+        JSON.stringify({ id: order.id, total: order.total }),
+        "application/json",
+      );
+    } catch (err) {
+      if (!err.status) throw err;
+      return send(
+        res,
+        err.status,
+        JSON.stringify({ error: err.message }),
+        "application/json",
+      );
+    }
+  }
+  if (req.method === "POST" && p === "/account/register") {
+    let d = S(),
+      x = form(await parseBody(req)),
+      r = CUSTOMER.register(d, x);
+    if (r.error)
+      return send(
+        res,
+        400,
+        page("إنشاء حساب", CUSTOMER.authBody("register", r.error, esc)),
+      );
+    W(d);
+    return send(res, 302, "", "text/plain", {
+      "set-cookie": CUSTOMER.sessionCookie(
+        r.customer.id,
+        CUSTOMER_SESSION_SECRET,
+        r.customer.sessionVersion || 0,
+      ),
+      location: "/account",
+    });
+  }
+  if (req.method === "POST" && p === "/account/login") {
+    let d = S(),
+      x = form(await parseBody(req)),
+      r = CUSTOMER.login(d, x.phone, x.password);
+    if (r.error)
+      return send(
+        res,
+        401,
+        page("تسجيل الدخول", CUSTOMER.authBody("login", r.error, esc)),
+      );
+    return send(res, 302, "", "text/plain", {
+      "set-cookie": CUSTOMER.sessionCookie(
+        r.customer.id,
+        CUSTOMER_SESSION_SECRET,
+        r.customer.sessionVersion || 0,
+      ),
+      location: "/account",
+    });
+  }
+  if (req.method === "POST" && p === "/account/logout") {
+    let d = S(),
+      c = CUSTOMER.sessionCustomer(req, d, CUSTOMER_SESSION_SECRET),
+      x = form(await parseBody(req));
+    if (!c) return red(res, "/account/login");
+    if (!CUSTOMER.csrfValid(c.id, CUSTOMER_SESSION_SECRET, x.csrf))
+      return send(res, 403, "Forbidden");
+    return send(res, 302, "", "text/plain", {
+      "set-cookie": CUSTOMER.clearCookie(),
+      location: "/",
+    });
+  }
+  if (req.method === "POST" && p === "/account/profile") {
+    let d = S(),
+      c = CUSTOMER.sessionCustomer(req, d, CUSTOMER_SESSION_SECRET);
+    if (!c) return red(res, "/account/login");
+    let x = form(await parseBody(req));
+    if (!CUSTOMER.csrfValid(c.id, CUSTOMER_SESSION_SECRET, x.csrf))
+      return send(res, 403, "Forbidden");
+    let r = CUSTOMER.updateProfile(d, c, x);
+    if (r.error)
+      return send(
+        res,
+        400,
+        page(
+          "حسابي",
+          CUSTOMER.accountBody(
+            c,
+            d,
+            d.settings,
+            esc,
+            money,
+            r.error,
+            CUSTOMER.csrfToken(c.id, CUSTOMER_SESSION_SECRET),
+          ),
+        ),
+      );
+    W(d);
+    return send(
+      res,
+      200,
+      page(
+        "حسابي",
+        CUSTOMER.accountBody(
+          c,
+          d,
+          d.settings,
+          esc,
+          money,
+          "تم حفظ بياناتك بنجاح",
+          CUSTOMER.csrfToken(c.id, CUSTOMER_SESSION_SECRET),
+        ),
+      ),
+    );
+  }
+  if (req.method === "POST" && p === "/account/password") {
+    let d = S(),
+      c = CUSTOMER.sessionCustomer(req, d, CUSTOMER_SESSION_SECRET);
+    if (!c) return red(res, "/account/login");
+    let x = form(await parseBody(req));
+    if (!CUSTOMER.csrfValid(c.id, CUSTOMER_SESSION_SECRET, x.csrf))
+      return send(res, 403, "Forbidden");
+    let r = CUSTOMER.changePassword(c, x.currentPassword, x.newPassword);
+    if (r.error)
+      return send(
+        res,
+        400,
+        page(
+          "حسابي",
+          CUSTOMER.accountBody(
+            c,
+            d,
+            d.settings,
+            esc,
+            money,
+            r.error,
+            CUSTOMER.csrfToken(c.id, CUSTOMER_SESSION_SECRET),
+          ),
+        ),
+      );
+    W(d);
+    return send(
+      res,
+      200,
+      page(
+        "حسابي",
+        CUSTOMER.accountBody(
+          c,
+          d,
+          d.settings,
+          esc,
+          money,
+          "تم تغيير كلمة المرور وتسجيل خروج الجلسات الأخرى",
+          CUSTOMER.csrfToken(c.id, CUSTOMER_SESSION_SECRET),
+        ),
+      ),
+      "text/html; charset=utf-8",
+      {
+        "set-cookie": CUSTOMER.sessionCookie(
+          c.id,
+          CUSTOMER_SESSION_SECRET,
+          c.sessionVersion || 0,
+        ),
+      },
+    );
+  }
+  if (req.method === "GET" && p === "/admin") return send(res, 200, admin(req));
+  if (req.method === "GET" && p === "/admin/orders-ping") {
+    if (!ses(req)) return send(res, 401, "{}", "application/json");
+    let d = S(),
+      o = [...d.orders].reverse().find((x) => !x.archivedAt);
+    return send(
+      res,
+      200,
+      JSON.stringify({
+        latestId: o?.id || "",
+        name: o?.name || "",
+        total: o?.total || 0,
+        unread: d.orders.filter((x) => x.readAt === null && !x.archivedAt)
+          .length,
+      }),
+      "application/json",
+    );
+  }
+  if (req.method === "GET" && p === "/admin/orders.csv") {
+    if (!ses(req)) return red(res, "/admin");
+    return send(res, 200, exportOrdersCsv(req), "text/csv; charset=utf-8", {
+      "content-disposition": 'attachment; filename="nova-orders.csv"',
+      "cache-control": "no-store",
+    });
+  }
+  if (req.method === "POST" && p === "/admin/login") {
+    if (!adminLoginAllowed(req))
+      return send(
+        res,
+        429,
+        admin(req, "محاولات دخول كثيرة. حاول بعد 15 دقيقة."),
+      );
+    let x = form(await parseBody(req));
+    if (!ADMIN_EMAIL || !ADMIN_PASSWORD)
+      return send(
+        res,
+        503,
+        admin(
+          req,
+          "لوحة الإدارة غير مهيأة: يجب ضبط ADMIN_EMAIL و ADMIN_PASSWORD في متغيرات البيئة.",
+        ),
+      );
+    if (x.email === ADMIN_EMAIL && x.password === ADMIN_PASSWORD) {
+      let id = crypto.randomBytes(24).toString("hex");
+      sessions.set(id, {
+        at: Date.now(),
+        csrf: crypto.randomBytes(32).toString("hex"),
+      });
+      adminLoginAttempts.delete(req.socket.remoteAddress || "unknown");
+      return send(res, 302, "", "text/plain", {
+        "set-cookie": `sid=${id}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=28800`,
+        "cache-control": "no-store",
+        location: "/admin",
+      });
+    }
+    return send(res, 401, admin(req, "بيانات الدخول غير صحيحة"));
+  }
+  if (p.startsWith("/admin/") && !ses(req)) return red(res, "/admin");
+  if (req.method === "POST" && p === "/admin/logout") {
+    let x = form(await parseBody(req));
+    if (!csrfOk(req, x.csrf)) return send(res, 403, "Forbidden");
+    let c = cookie(req);
+    sessions.delete(c.sid);
+    return send(res, 302, "", "text/plain", {
+      "set-cookie":
+        "sid=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0",
+      "cache-control": "no-store",
+      location: "/admin",
+    });
+  }
+  if (req.method === "POST" && p === "/admin/product") {
+    let x = form(await parseBody(req));
+    if (!csrfOk(req, x.csrf)) return send(res, 403, "Forbidden");
+    if (
+      !x.name?.trim() ||
+      x.name.length > 160 ||
+      !x.cat?.trim() ||
+      x.cat.length > 80 ||
+      !Number.isFinite(+x.price) ||
+      +x.price < 0 ||
+      !Number.isFinite(+x.old) ||
+      +x.old < 0 ||
+      !Number.isInteger(+x.stock) ||
+      +x.stock < 0 ||
+      !safeImage(x.img) ||
+      String(x.desc || "").length > 5000 ||
+      String(x.images || "")
+        .split(/[\n,]+/)
+        .filter((v) => v.trim())
+        .some((v) => !safeImage(v.trim()))
+    )
+      return send(
+        res,
+        400,
+        admin(req, "راجع بيانات المنتج: أسعار ومخزون صحيح، وصور بروابط HTTPS."),
+      );
+    let d = S(),
+      z = d.products.find((a) => a.id === x.id),
+      o = {
+        id: z?.id || "p" + crypto.randomBytes(6).toString("hex"),
+        name: x.name,
+        cat: x.cat,
+        price: +x.price || 0,
+        old: +x.old || 0,
+        stock: Math.max(0, +x.stock || 0),
+        img: x.img,
+        images: String(x.images || "")
+          .split(/[\n,]+/)
+          .map((v) => v.trim())
+          .filter(Boolean)
+          .slice(0, 7),
+        desc: x.desc || "",
+      };
+    z ? Object.assign(z, o) : d.products.push(o);
+    W(d);
+    return red(res, "/admin#products");
+  }
+  if (
+    ["POST", "PATCH"].includes(req.method) &&
+    ["/admin/product-restore", "/admin/order-restore"].includes(p)
+  ) {
+    const x = form(await parseBody(req));
+    if (!csrfOk(req, x.csrf)) return send(res, 403, "Forbidden");
+    const d = S(),
+      item = (p === "/admin/product-restore" ? d.products : d.orders).find(
+        (i) => i.id === x.id,
+      );
+    if (item) item.archivedAt = null;
+    W(d);
+    return red(res, "/admin");
+  }
+  if (req.method === "POST" && p === "/admin/delete") {
+    let x = form(await parseBody(req));
+    if (!csrfOk(req, x.csrf)) return send(res, 403, "Forbidden");
+    let d = S();
+    const product = d.products.find((a) => a.id === x.id);
+    if (product) product.archivedAt = new Date().toISOString();
+    W(d);
+    return red(res, "/admin#products");
+  }
+  if (req.method === "POST" && p === "/admin/read") {
+    let x = form(await parseBody(req));
+    if (!csrfOk(req, x.csrf)) return send(res, 403, "Forbidden");
+    let d = S(),
+      o = d.orders.find((a) => a.id === x.id);
+    if (o) o.readAt = new Date().toISOString();
+    W(d);
+    return red(res, "/admin#orders");
+  }
+  if (req.method === "POST" && p === "/admin/order-archive") {
+    let x = form(await parseBody(req));
+    if (!csrfOk(req, x.csrf)) return send(res, 403, "Forbidden");
+    let d = S(),
+      o = d.orders.find((a) => a.id === x.id);
+    if (o) {
+      o.archivedAt = new Date().toISOString();
+    }
+    W(d);
+    return red(res, "/admin#orders");
+  }
+  if (req.method === "POST" && p === "/admin/status") {
+    let x = form(await parseBody(req));
+    if (!csrfOk(req, x.csrf)) return send(res, 403, "Forbidden");
+    let d = S(),
+      o = d.orders.find((a) => a.id === x.id);
+    if (o) {
+      if (!COMMERCE.statuses.includes(x.status))
+        return send(res, 400, "حالة الطلب غير صالحة");
+      let prev = o.status,
+        next = x.status;
+      if (next === "ملغي" && prev !== "ملغي" && !o.inventoryRestored) {
+        for (let i of o.items) {
+          let z = d.products.find((a) => a.id === i.id);
+          if (z) z.stock = (+z.stock || 0) + (+i.q || 0);
+        }
+        o.inventoryRestored = true;
+      }
+      if (prev === "ملغي" && next !== "ملغي" && o.inventoryRestored) {
+        let enough = o.items.every((i) => {
+          let z = d.products.find((a) => a.id === i.id);
+          return z && (+z.stock || 0) >= (+i.q || 0);
+        });
+        if (enough) {
+          for (let i of o.items) {
+            let z = d.products.find((a) => a.id === i.id);
+            z.stock -= +i.q || 0;
+          }
+          o.inventoryRestored = false;
+        } else next = "ملغي";
+      }
+      o.status = next;
+    }
+    W(d);
+    return red(res, "/admin#orders");
+  }
+  if (req.method === "POST" && p === "/admin/settings") {
+    let x = form(await parseBody(req));
+    if (!csrfOk(req, x.csrf)) return send(res, 403, "Forbidden");
+    if (
+      !x.name?.trim() ||
+      !x.en?.trim() ||
+      !x.currency?.trim() ||
+      x.name.length > 120 ||
+      x.en.length > 120 ||
+      x.currency.length > 12 ||
+      !Number.isFinite(+x.ship) ||
+      !Number.isFinite(+x.free) ||
+      +x.ship < 0 ||
+      +x.free < 0
+    )
+      return send(
+        res,
+        400,
+        admin(req, "راجع اسم المتجر والعملة وتكاليف الشحن."),
+      );
+    let d = S();
+    d.settings = {
+      ...d.settings,
+      name: x.name,
+      en: x.en,
+      tag: x.tag,
+      currency: x.currency,
+      wa: x.wa,
+      ship: Math.max(0, +x.ship || 0),
+      free: Math.max(0, +x.free || 0),
+    };
+    W(d);
+    return red(res, "/admin#settings");
+  }
+  return send(
+    res,
+    404,
+    page(
+      "الصفحة غير موجودة",
+      '<main id="main-content" class="wrap section"><div class="emptyState"><h1>يبدو أنك أخذت لفة زيادة.</h1><p>الصفحة غير موجودة، لكن اختيارات نوفا تنتظرك.</p><a class="btn hot" href="/">العودة للرئيسية</a></div></main>',
+      "",
+      { noindex: true },
+    ),
+  );
+}
+const attempts = new Map();
+function rateAllowed(req) {
+  const key =
+    (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "unknown")
+      .split(",")
+      .pop()
+      .trim() +
+    ":" +
+    req.url.split("?")[0];
+  const now = Date.now();
+  let entry = attempts.get(key);
+  if (!entry || now - entry.at > 900000) entry = { at: now, n: 0 };
+  entry.n++;
+  attempts.set(key, entry);
+  return entry.n <= 60;
+}
+setInterval(() => {
+  for (const [key, a] of attempts)
+    if (Date.now() - a.at > 900000) attempts.delete(key);
+}, 60000).unref();
+const server = http.createServer(async (req, res) => {
+  try {
+    const url = new URL(req.url, "http://localhost");
+    if (["POST", "PATCH"].includes(req.method)) {
+      if (
+        req.headers.origin &&
+        new URL(req.headers.origin).host !== req.headers.host
+      )
+        return send(res, 403, "Forbidden");
+      if (!rateAllowed(req))
+        return send(
+          res,
+          429,
+          JSON.stringify({ error: "محاولات كثيرة. حاول بعد قليل." }),
+          "application/json",
+          { "retry-after": "900" },
+        );
+      req.rawBody = await readBody(req);
+    }
+    let response;
+    const buffered = {
+      _head: false,
+      writeHead: (...args) => {
+        response = { args };
+      },
+      end: (body) => {
+        response.body = body;
+      },
+    };
+    await storage.run(["POST", "PATCH"].includes(req.method), () =>
+      handle(req, buffered),
+    );
+    res.writeHead(...response.args);
+    res.end(response.body);
+  } catch (err) {
+    console.error("Request failed:", err.code || err.name);
+    send(
+      res,
+      err.status || 503,
+      JSON.stringify({
+        error:
+          err.status === 413
+            ? "حجم الطلب كبير جدًا."
+            : "تعذر حفظ أو تحميل البيانات. حاول مجددًا.",
+      }),
+      "application/json",
+    );
+  }
+});
+server.requestTimeout = 30000;
+server.headersTimeout = 15000;
+storage
+  .init()
+  .then(async () => {
+    await storage.run(false, () => {
+      const d = S();
+      console.log(
+        "NOVA storage verified: products=" +
+          d.products.length +
+          "; orders=" +
+          d.orders.length +
+          "; customers=" +
+          (d.customers || []).length,
+      );
+    });
+    if (!process.env.CUSTOMER_SESSION_SECRET)
+      console.warn(
+        "CUSTOMER_SESSION_SECRET is not configured; customer sessions reset on restart",
+      );
+  })
+  .then(() =>
+    server.listen(PORT, "0.0.0.0", () =>
+      console.log(
+        "NOVA on " + PORT + "; storage=" + (pool ? "postgres" : "file"),
+      ),
+    ),
+  )
+  .catch(() => {
+    console.error("Store startup failed; existing data was not replaced");
+    process.exitCode = 1;
+    pool?.end();
+  });
+let shuttingDown = false;
+async function shutdown() {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  server.close(async () => {
+    await storage.close();
+    process.exit(0);
+  });
+  setTimeout(() => process.exit(1), 10000).unref();
+}
+process.on("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);

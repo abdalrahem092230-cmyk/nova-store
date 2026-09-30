@@ -1,12 +1,13 @@
 {
   "name": "nova-store-ar",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "private": true,
   "description": "Arabic RTL ecommerce store with full admin control",
   "scripts": {
     "start": "node server.js",
     "start:db": "node server-db.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "test": "node --test"
   },
   "engines": {
     "node": ">=18"
