@@ -10,9 +10,32 @@ const ADMIN_ORDERS = require("./admin-orders");
 const CUSTOMER = require("./customer-account");
 const MOBILE = require("./mobile-api");
 const CUSTOMER_SESSION_SECRET =
-  process.env.CUSTOMER_SESSION_SECRET || crypto.randomBytes(32).toString("hex");
+  process.env.CUSTOMER_SESSION_SECRET ||
+  crypto
+    .createHash("sha256")
+    .update(
+      "nova-customer-session:" +
+        String(
+          process.env.NEON_DATABASE_URL ||
+            process.env.DATABASE_URL ||
+            process.env.RENDER_SERVICE_ID ||
+            "local-dev",
+        ),
+    )
+    .digest("hex");
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "",
   ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "";
+const ADMIN_SESSION_SECRET =
+  process.env.ADMIN_SESSION_SECRET ||
+  crypto
+    .createHash("sha256")
+    .update(
+      "nova-admin-session:" +
+        CUSTOMER_SESSION_SECRET +
+        ":" +
+        String(ADMIN_PASSWORD || "unset"),
+    )
+    .digest("hex");
 const PORT = +process.env.PORT || 3000,
   DIR = process.env.DATA_DIR || path.join(__dirname, "data"),
   FILE = path.join(DIR, "store.json");
@@ -135,8 +158,7 @@ const esc = (s) =>
           "'": "&#39;",
         })[c],
     ),
-  money = (n) => new Intl.NumberFormat("ar-LY-u-nu-latn").format(+n || 0),
-  sessions = new Map();
+  money = (n) => new Intl.NumberFormat("ar-LY-u-nu-latn").format(+n || 0);
 const css = `.features{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}.feat{padding:20px;border:1px solid var(--line);border-radius:12px}.feat b{display:block;margin:8px 0;font-size:21px}.feat .muted{font-size:11px}.adminnav{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:20px}.table{width:100%;border-collapse:collapse;min-width:720px}.table th,.table td{padding:14px;border-bottom:1px solid var(--line);text-align:right;font-size:12px}.scroll{overflow:auto}.login{min-height:100vh;display:grid;place-items:center}.login .adminbox{width:min(430px,92vw)}@media(max-width:700px){.features{grid-template-columns:1fr 1fr}}`;
 const proCss = "";
 function page(title, body, extra = "", meta = {}) {
@@ -255,15 +277,30 @@ function cookie(req) {
       }),
   );
 }
+function adminSessionToken(csrf, exp = Date.now() + 28800000) {
+  const payload = String(exp) + "." + csrf;
+  const sig = crypto
+    .createHmac("sha256", ADMIN_SESSION_SECRET)
+    .update(payload)
+    .digest("hex");
+  return payload + "." + sig;
+}
 function ses(req) {
-  let c = cookie(req),
-    s = sessions.get(c.sid);
-  if (!s) return null;
-  if (Date.now() - s.at > 28800000) {
-    sessions.delete(c.sid);
+  const raw = cookie(req).sid || "";
+  const parts = raw.split(".");
+  if (parts.length !== 3) return null;
+  const [exp, csrf, sig] = parts;
+  if (!/^\d+$/.test(exp) || Number(exp) < Date.now() || !csrf || !sig)
     return null;
-  }
-  return s;
+  const payload = exp + "." + csrf;
+  const expected = crypto
+    .createHmac("sha256", ADMIN_SESSION_SECRET)
+    .update(payload)
+    .digest("hex");
+  const a = Buffer.from(sig),
+    b = Buffer.from(expected);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+  return { csrf, exp: Number(exp) };
 }
 function csrfOk(req, token) {
   let s = ses(req),
@@ -717,7 +754,19 @@ async function handle(req, res) {
     return send(res, 200, checkout(req));
   if (req.method === "GET" && p === "/track") return send(res, 200, track(req));
   if (req.method === "GET" && p === "/health")
-    return send(res, 200, '{"ok":true}', "application/json");
+    return send(
+      res,
+      200,
+      JSON.stringify({
+        ok: true,
+        storage: pool ? "postgres" : "file",
+        accountSessions: "signed",
+        adminSessions: "signed",
+      }),
+      "application/json",
+    );
+  if (req.method === "GET" && ["/account/", "/admin/"].includes(p))
+    return red(res, p.slice(0, -1));
   if (req.method === "GET" && p === "/account/login")
     return send(
       res,
@@ -1006,14 +1055,11 @@ async function handle(req, res) {
         ),
       );
     if (x.email === ADMIN_EMAIL && x.password === ADMIN_PASSWORD) {
-      let id = crypto.randomBytes(24).toString("hex");
-      sessions.set(id, {
-        at: Date.now(),
-        csrf: crypto.randomBytes(32).toString("hex"),
-      });
+      const csrf = crypto.randomBytes(32).toString("hex"),
+        sid = adminSessionToken(csrf);
       adminLoginAttempts.delete(req.socket.remoteAddress || "unknown");
       return send(res, 302, "", "text/plain", {
-        "set-cookie": `sid=${id}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=28800`,
+        "set-cookie": `sid=${encodeURIComponent(sid)}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=28800`,
         "cache-control": "no-store",
         location: "/admin",
       });
@@ -1024,11 +1070,9 @@ async function handle(req, res) {
   if (req.method === "POST" && p === "/admin/logout") {
     let x = form(await parseBody(req));
     if (!csrfOk(req, x.csrf)) return send(res, 403, "Forbidden");
-    let c = cookie(req);
-    sessions.delete(c.sid);
     return send(res, 302, "", "text/plain", {
       "set-cookie":
-        "sid=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0",
+        "sid=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0",
       "cache-control": "no-store",
       location: "/admin",
     });
@@ -1290,7 +1334,11 @@ storage
     });
     if (!process.env.CUSTOMER_SESSION_SECRET)
       console.warn(
-        "CUSTOMER_SESSION_SECRET is not configured; customer sessions reset on restart",
+        "CUSTOMER_SESSION_SECRET is not configured; using a stable derived session secret",
+      );
+    if (!process.env.ADMIN_SESSION_SECRET)
+      console.warn(
+        "ADMIN_SESSION_SECRET is not configured; using a stable derived admin session secret",
       );
   })
   .then(() =>
