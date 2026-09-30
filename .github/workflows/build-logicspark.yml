@@ -66,3 +66,42 @@ jobs:
             app/build/reports/lint-results-debug.html
           if-no-files-found: ignore
           retention-days: 30
+  device:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: LogicSpark-v0.1.0-preview
+          path: dist
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - name: Enable hardware acceleration
+        run: |
+          sudo chmod 666 /dev/kvm
+      - name: Test the actual APK on Android 15
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: python3 test/android_smoke.py
+      - name: Upload Android screenshots and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: LogicSpark-device-checks
+          path: device-results/
+          if-no-files-found: ignore
+          retention-days: 30
