@@ -134,6 +134,21 @@ jobs:
             echo "$body" | grep -q '"accounts":true'
           done
 
+      - name: Collect recent safe error diagnostics
+        if: always()
+        shell: bash
+        run: |
+          curl -fsS --max-time 20 https://nova-store.l.cd/health/errors > recent-errors.json || echo '{"ok":false,"errors":[]}' > recent-errors.json
+          cat recent-errors.json
+
+      - name: Upload recent error diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: recent-errors
+          path: recent-errors.json
+          if-no-files-found: error
+
       - name: Check health payload
         shell: bash
         run: |
