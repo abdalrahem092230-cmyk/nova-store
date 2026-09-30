@@ -34,11 +34,17 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Install Android API 36
-        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Smoke test mobile preview API
+        working-directory: .
+        run: |
+          curl --fail --retry 12 --retry-delay 5 --retry-all-errors \
+            https://nova-mobile-safe-preview.onrender.com/api/mobile/bootstrap \
+            | grep -q '"products"'
 
       - name: Install dependencies
         run: npm install --no-audit --no-fund
