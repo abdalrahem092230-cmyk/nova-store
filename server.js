@@ -1296,13 +1296,27 @@ const server = http.createServer(async (req, res) => {
         response.body = body;
       },
     };
-    await storage.run(["POST", "PATCH"].includes(req.method), () =>
-      handle(req, buffered),
-    );
+    const pathName = url.pathname;
+    const readOnlyPostRoutes = new Set([
+      "/account/login",
+      "/admin/login",
+      "/account/logout",
+      "/admin/logout",
+      "/api/quote",
+    ]);
+    const writableRequest =
+      ["POST", "PATCH"].includes(req.method) && !readOnlyPostRoutes.has(pathName);
+    await storage.run(writableRequest, () => handle(req, buffered));
     res.writeHead(...response.args);
     res.end(response.body);
   } catch (err) {
-    console.error("Request failed:", err.code || err.name);
+    console.error(
+      "Request failed:",
+      req.method,
+      req.url,
+      err.code || err.name,
+      err.message || "",
+    );
     send(
       res,
       err.status || 503,
