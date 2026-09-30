@@ -92,6 +92,22 @@ jobs:
           cat /tmp/body || true
           test "$code" = "401"
 
+      - name: Browser-like Origin headers work on custom domain
+        shell: bash
+        run: |
+          set -euo pipefail
+          custom="https://nova-store.l.cd"
+
+          code="$(curl -sS -o /tmp/body -w "%{http_code}" --max-time 20 -X POST             -H "Origin: https://nova-store.l.cd"             -H "content-type: application/x-www-form-urlencoded"             --data "phone=0929999999&password=definitely-wrong"             "$custom/account/login")"
+          echo "account browser-like POST -> $code"
+          cat /tmp/body || true
+          test "$code" = "401"
+
+          code="$(curl -sS -o /tmp/body -w "%{http_code}" --max-time 20 -X POST             -H "Origin: https://nova-store.l.cd"             -H "content-type: application/x-www-form-urlencoded"             --data "email=smoke-test%40example.invalid&password=definitely-wrong"             "$custom/admin/login")"
+          echo "admin browser-like POST -> $code"
+          cat /tmp/body || true
+          test "$code" = "401"
+
       - name: Malformed stale cookies do not break login pages
         shell: bash
         run: |
