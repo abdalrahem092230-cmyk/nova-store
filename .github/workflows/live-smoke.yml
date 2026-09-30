@@ -122,6 +122,18 @@ jobs:
             test "$code" = "200"
           done
 
+      - name: Production render diagnostics
+        shell: bash
+        run: |
+          set -euo pipefail
+          for base in "https://nova-store-icxo.onrender.com" "https://nova-store.l.cd"; do
+            body="$(curl -fsS --max-time 20 "$base/health/render")"
+            echo "$base -> $body"
+            echo "$body" | grep -q '"ok":true'
+            echo "$body" | grep -q '"adminOrders":true'
+            echo "$body" | grep -q '"accounts":true'
+          done
+
       - name: Check health payload
         shell: bash
         run: |
