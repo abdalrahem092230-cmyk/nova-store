@@ -4,18 +4,23 @@ const { Pool } = require('pg');
 
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const STORE_FILE = path.join(DATA_DIR, 'store.json');
-const DATABASE_URL = process.env.DATABASE_URL;
+const LEGACY_DATABASE_URL = process.env.DATABASE_URL;
+const PRIMARY_DATABASE_URL = process.env.NEON_DATABASE_URL || LEGACY_DATABASE_URL;
 
-if (!DATABASE_URL) {
+if (!PRIMARY_DATABASE_URL) {
   console.error('DATABASE_URL is missing. Falling back to local file storage.');
   require('./server.js');
   return;
 }
 
-const pool = new Pool({
-  connectionString: DATABASE_URL,
-  ssl: process.env.PGSSL === 'true' ? { rejectUnauthorized: false } : undefined
-});
+function makePool(connectionString) {
+  return new Pool({
+    connectionString,
+    ssl: process.env.PGSSL === 'true' ? { rejectUnauthorized: false } : undefined
+  });
+}
+
+const pool = makePool(PRIMARY_DATABASE_URL);
 
 const defaultState = {
   settings: {
@@ -54,6 +59,20 @@ function persistRaw(raw) {
     .catch(err => console.error('Database sync failed:', err.message));
 }
 
+async function loadLegacyState() {
+  if (!process.env.NEON_DATABASE_URL || !LEGACY_DATABASE_URL || LEGACY_DATABASE_URL === PRIMARY_DATABASE_URL) return null;
+  const legacyPool = makePool(LEGACY_DATABASE_URL);
+  try {
+    const legacy = await legacyPool.query('SELECT data FROM nova_state WHERE id = 1');
+    return legacy.rowCount ? legacy.rows[0].data : null;
+  } catch (err) {
+    console.error('Legacy database migration read failed:', err.message);
+    return null;
+  } finally {
+    await legacyPool.end().catch(() => {});
+  }
+}
+
 async function boot() {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 
@@ -71,11 +90,13 @@ async function boot() {
   if (found.rowCount) {
     state = found.rows[0].data;
   } else {
-    state = defaultState;
+    const legacyState = await loadLegacyState();
+    state = legacyState || defaultState;
     await pool.query(
       'INSERT INTO nova_state (id, data) VALUES (1, $1::jsonb)',
       [JSON.stringify(state)]
     );
+    if (legacyState) console.log('NOVA state migrated from Render PostgreSQL to Neon');
   }
 
   const raw = JSON.stringify(state, null, 2);
@@ -113,7 +134,7 @@ async function boot() {
     }
   });
 
-  console.log('NOVA persistent storage connected to Render PostgreSQL');
+  console.log(`NOVA persistent storage connected to ${process.env.NEON_DATABASE_URL ? 'Neon PostgreSQL' : 'Render PostgreSQL'}`);
   require('./server.js');
 }
 
