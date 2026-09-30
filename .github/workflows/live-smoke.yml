@@ -110,6 +110,20 @@ jobs:
           cat /tmp/body || true
           test "$code" = "401"
 
+      - name: Null Origin headers do not crash login
+        shell: bash
+        run: |
+          set -euo pipefail
+          for base in "https://nova-store-icxo.onrender.com" "https://nova-store.l.cd"; do
+            code="$(curl -sS -o /tmp/body -w "%{http_code}" --max-time 20 -X POST               -H "Origin: null"               -H "content-type: application/x-www-form-urlencoded"               --data "phone=0929999999&password=definitely-wrong"               "$base/account/login")"
+            echo "$base account null-origin -> $code"
+            test "$code" = "401"
+
+            code="$(curl -sS -o /tmp/body -w "%{http_code}" --max-time 20 -X POST               -H "Origin: null"               -H "content-type: application/x-www-form-urlencoded"               --data "email=smoke-test%40example.invalid&password=definitely-wrong"               "$base/admin/login")"
+            echo "$base admin null-origin -> $code"
+            test "$code" = "401"
+          done
+
       - name: Malformed stale cookies do not break login pages
         shell: bash
         run: |
