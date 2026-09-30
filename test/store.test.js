@@ -284,6 +284,12 @@ test("HTTP pages, embedded scripts, escaping, checkout, tracking, admin inventor
       route + " escapes product names",
     );
   }
+  for (const size of [32, 192, 512]) {
+    const icon = await fetch(base + `/nova-icon-${size}.png`);
+    assert.equal(icon.status, 200);
+    assert.match(icon.headers.get("content-type"), /image\/png/);
+    assert.deepEqual(Buffer.from(await icon.arrayBuffer()).subarray(0, 8), Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+  }
   assert.equal((await fetch(base + "/product?id=missing")).status, 404);
   assert.equal((await fetch(base + "/missing")).status, 404);
   const quoteResponse = await post("/api/quote", {

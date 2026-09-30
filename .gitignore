@@ -6,3 +6,6 @@ data/
 coverage/
 *.log
 .DS_Store
+mobile/android/
+mobile/.expo/
+mobile/dist-check/
